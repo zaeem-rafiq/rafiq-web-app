@@ -79,22 +79,22 @@ export default function Zakat() {
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 
   return (
-    <main className="container mx-auto max-w-2xl px-4 py-8 sm:py-12">
-      <div className="mb-8 text-center">
-        <h1 className="font-serif text-3xl font-bold text-foreground sm:text-4xl">
+    <main className="container mx-auto max-w-2xl px-4 py-10 sm:py-14">
+      <div className="mb-10 text-center">
+        <h1 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">
           Zakat Calculator
         </h1>
-        <p className="mt-2 text-muted-foreground">
+        <p className="mt-3 text-muted-foreground">
           Calculate your obligation across all five madhabs
         </p>
       </div>
 
       {/* Step indicators */}
-      <div className="mb-8 flex items-center justify-center gap-2">
+      <div className="mb-10 flex items-center justify-center gap-2">
         {[1, 2, 3].map((s) => (
           <div key={s} className="flex items-center gap-2">
             <div
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition-colors ${
+              className={`flex h-9 w-9 items-center justify-center rounded-full font-ui text-sm font-semibold transition-colors ${
                 step >= s
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground"
@@ -103,7 +103,7 @@ export default function Zakat() {
               {s}
             </div>
             {s < 3 && (
-              <div className={`h-0.5 w-8 rounded ${step > s ? "bg-primary" : "bg-muted"}`} />
+              <div className={`h-0.5 w-10 rounded-full ${step > s ? "bg-primary" : "bg-muted"}`} />
             )}
           </div>
         ))}
@@ -118,20 +118,20 @@ export default function Zakat() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -30 }}
           >
-            <Card className="border-border/60 bg-card/80">
+            <Card className="border-border/50 bg-card shadow-sm">
               <CardHeader>
-                <CardTitle className="font-serif">Select Your Madhab</CardTitle>
+                <CardTitle className="font-heading">Select Your Madhab</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5">
                 <div className="flex flex-wrap gap-2">
                   {madhabs.map((m) => (
                     <button
                       key={m}
                       onClick={() => setMadhab(m)}
-                      className={`rounded-full px-5 py-2.5 text-sm font-medium transition-all ${
+                      className={`rounded-full px-5 py-2.5 font-ui text-sm font-medium transition-all ${
                         madhab === m
                           ? "bg-primary text-primary-foreground shadow-md"
-                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                          : "bg-muted text-muted-foreground hover:bg-muted/70"
                       }`}
                     >
                       {m}
@@ -140,22 +140,22 @@ export default function Zakat() {
                 </div>
 
                 {showNisabToggle && (
-                  <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/40 p-4">
+                  <div className="flex items-center justify-between rounded-2xl border border-border/50 bg-muted/30 p-5">
                     <div>
-                      <p className="text-sm font-medium text-foreground">Nisab Standard</p>
+                      <p className="font-ui text-sm font-medium text-foreground">Nisab Standard</p>
                       <p className="text-xs text-muted-foreground">
                         Choose gold or silver for threshold
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`text-xs font-medium ${nisabStandard === "silver" ? "text-foreground" : "text-muted-foreground"}`}>
+                      <span className={`font-ui text-xs font-medium ${nisabStandard === "silver" ? "text-foreground" : "text-muted-foreground"}`}>
                         Silver
                       </span>
                       <Switch
                         checked={nisabStandard === "gold"}
                         onCheckedChange={(c) => setNisabStandard(c ? "gold" : "silver")}
                       />
-                      <span className={`text-xs font-medium ${nisabStandard === "gold" ? "text-foreground" : "text-muted-foreground"}`}>
+                      <span className={`font-ui text-xs font-medium ${nisabStandard === "gold" ? "text-foreground" : "text-muted-foreground"}`}>
                         Gold
                       </span>
                     </div>
@@ -163,7 +163,7 @@ export default function Zakat() {
                 )}
 
                 {madhab === "Ja'fari" && (
-                  <div className="flex gap-3 rounded-xl border border-accent/30 bg-accent/10 p-4">
+                  <div className="flex gap-3 rounded-2xl border border-accent/20 bg-accent/5 p-5">
                     <Info className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
                     <p className="text-sm text-foreground">
                       Cash and investments fall under <strong>Khums (20%)</strong>, not Zakat.
@@ -172,7 +172,7 @@ export default function Zakat() {
                   </div>
                 )}
 
-                <Button onClick={() => setStep(2)} className="w-full gap-2">
+                <Button onClick={() => setStep(2)} className="w-full gap-2 font-ui font-semibold">
                   Continue <ArrowRight size={16} />
                 </Button>
               </CardContent>
@@ -188,11 +188,11 @@ export default function Zakat() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -30 }}
           >
-            <Card className="border-border/60 bg-card/80">
+            <Card className="border-border/50 bg-card shadow-sm">
               <CardHeader>
-                <CardTitle className="font-serif">Enter Your Assets</CardTitle>
+                <CardTitle className="font-heading">Enter Your Assets</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5">
                 {[
                   { key: "cash" as const, label: "Cash & Bank Accounts", unit: "USD" },
                   { key: "gold" as const, label: "Gold", unit: "grams" },
@@ -202,9 +202,9 @@ export default function Zakat() {
                   { key: "debtsOwed" as const, label: "Debts Owed (Deductions)", unit: "USD" },
                 ].map((field) => (
                   <div key={field.key}>
-                    <Label className="text-sm">{field.label}</Label>
-                    <div className="relative mt-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    <Label className="font-ui text-sm font-medium">{field.label}</Label>
+                    <div className="relative mt-1.5">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                         {field.unit}
                       </span>
                       <Input
@@ -220,7 +220,7 @@ export default function Zakat() {
                 ))}
 
                 {!pricesLoading && (
-                  <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground">
+                  <div className="rounded-2xl bg-muted/30 p-4 text-xs text-muted-foreground">
                     <DollarSign className="mr-1 inline h-3 w-3" />
                     Live prices: Gold {fmt(prices.goldPerGram)}/g · Silver{" "}
                     {fmt(prices.silverPerGram)}/g
@@ -228,10 +228,10 @@ export default function Zakat() {
                 )}
 
                 <div className="flex gap-3">
-                  <Button variant="outline" onClick={() => setStep(1)} className="gap-2">
+                  <Button variant="outline" onClick={() => setStep(1)} className="gap-2 font-ui font-semibold">
                     <ArrowLeft size={16} /> Back
                   </Button>
-                  <Button onClick={handleCalculate} className="flex-1 gap-2">
+                  <Button onClick={handleCalculate} className="flex-1 gap-2 font-ui font-semibold">
                     Calculate Zakat <Calculator size={16} />
                   </Button>
                 </div>
@@ -248,40 +248,40 @@ export default function Zakat() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -30 }}
           >
-            <Card className="border-border/60 bg-card/80">
+            <Card className="border-border/50 bg-card shadow-sm">
               <CardHeader>
-                <CardTitle className="font-serif">Your Zakat Results</CardTitle>
+                <CardTitle className="font-heading">Your Zakat Results</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Summary */}
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl bg-muted/60 p-4 text-center">
-                    <p className="text-xs font-medium text-muted-foreground">Total Assets</p>
-                    <p className="mt-1 text-lg font-bold text-foreground">{fmt(result.totalAssets)}</p>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-2xl bg-muted/40 p-5 text-center">
+                    <p className="font-ui text-xs font-medium text-muted-foreground">Total Assets</p>
+                    <p className="mt-1.5 font-heading text-lg font-bold text-foreground">{fmt(result.totalAssets)}</p>
                   </div>
-                  <div className="rounded-xl bg-muted/60 p-4 text-center">
-                    <p className="text-xs font-medium text-muted-foreground">Nisab Threshold</p>
-                    <p className="mt-1 text-lg font-bold text-foreground">{fmt(result.nisabThreshold)}</p>
+                  <div className="rounded-2xl bg-muted/40 p-5 text-center">
+                    <p className="font-ui text-xs font-medium text-muted-foreground">Nisab Threshold</p>
+                    <p className="mt-1.5 font-heading text-lg font-bold text-foreground">{fmt(result.nisabThreshold)}</p>
                     <p className="text-[10px] text-muted-foreground">
                       {result.nisabStandard === "gold" ? "85g Gold" : "595g Silver"} standard
                     </p>
                   </div>
-                  <div className="rounded-xl bg-primary p-4 text-center text-primary-foreground">
-                    <p className="text-xs font-medium opacity-80">
+                  <div className="rounded-2xl bg-primary p-5 text-center text-primary-foreground">
+                    <p className="font-ui text-xs font-medium opacity-80">
                       {result.isJafari ? "Total Due" : "Zakat Due (2.5%)"}
                     </p>
-                    <p className="mt-1 text-lg font-bold">{fmt(result.zakatDue)}</p>
+                    <p className="mt-1.5 font-heading text-lg font-bold">{fmt(result.zakatDue)}</p>
                   </div>
                 </div>
 
                 {!result.isAboveNisab && !result.isJafari && (
-                  <div className="rounded-xl border border-accent/30 bg-accent/10 p-4 text-center text-sm text-foreground">
+                  <div className="rounded-2xl border border-accent/20 bg-accent/5 p-5 text-center text-sm text-foreground">
                     Your net assets are below the Nisab threshold. No Zakat is due at this time.
                   </div>
                 )}
 
                 {result.isJafari && (
-                  <div className="flex gap-3 rounded-xl border border-accent/30 bg-accent/10 p-4">
+                  <div className="flex gap-3 rounded-2xl border border-accent/20 bg-accent/5 p-5">
                     <Info className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
                     <div className="text-sm text-foreground">
                       <strong>Ja'fari Calculation:</strong> Cash, investments, and business inventory
@@ -293,18 +293,18 @@ export default function Zakat() {
 
                 {/* Breakdown */}
                 <div>
-                  <h3 className="mb-3 text-sm font-semibold text-foreground">Breakdown</h3>
+                  <h3 className="mb-3 font-heading text-sm font-semibold text-foreground">Breakdown</h3>
                   <div className="space-y-2">
                     {result.breakdown.map((b) => (
                       <div
                         key={b.category}
-                        className="flex items-center justify-between rounded-lg border border-border/40 px-4 py-3"
+                        className="flex items-center justify-between rounded-xl border border-border/40 px-5 py-3.5"
                       >
                         <div>
-                          <p className="text-sm font-medium text-foreground">{b.category}</p>
+                          <p className="font-ui text-sm font-medium text-foreground">{b.category}</p>
                           <p className="text-xs text-muted-foreground">{fmt(Math.abs(b.amount))}</p>
                         </div>
-                        <span className="text-sm font-semibold text-primary">
+                        <span className="font-ui text-sm font-semibold text-primary">
                           {b.zakatOn > 0 ? fmt(b.zakatOn) : "—"}
                         </span>
                       </div>
@@ -312,7 +312,7 @@ export default function Zakat() {
                   </div>
                 </div>
 
-                <Button variant="outline" onClick={() => { setStep(1); setResult(null); }} className="w-full gap-2">
+                <Button variant="outline" onClick={() => { setStep(1); setResult(null); }} className="w-full gap-2 font-ui font-semibold">
                   <ArrowLeft size={16} /> Start Over
                 </Button>
               </CardContent>
