@@ -1,14 +1,10 @@
 import rafiqLogo from "@/assets/rafiq-logo.png";
-
 export default function FooterSection() {
-  return (
-    <footer className="border-t border-border/40 px-4 py-12">
+  return <footer className="border-t border-border/40 px-4 py-12">
       <div className="container mx-auto flex flex-col items-center gap-5 text-center">
         <div className="flex items-center gap-2.5">
           <img src={rafiqLogo} alt="Rafiq" className="h-9 w-auto" />
-          <span className="font-ui text-lg font-semibold tracking-tight text-foreground">
-            rafiq
-          </span>
+          
         </div>
         <p className="text-sm text-muted-foreground">
           Launching Ramadan 2026 · North America's Islamic Wealth Platform
@@ -22,6 +18,5 @@ export default function FooterSection() {
           </div>
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 }
