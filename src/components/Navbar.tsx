@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import rafiqLogo from "@/assets/rafiq-logo.png";
 
 const navLinks = [
   { to: "/", label: "Home" },
@@ -19,10 +20,7 @@ export default function Navbar() {
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <span className="font-serif text-lg font-bold text-primary-foreground">ر</span>
-          </div>
-          <span className="font-serif text-xl font-bold text-foreground">Rafiq</span>
+          <img src={rafiqLogo} alt="Rafiq" className="h-9 w-auto" />
         </Link>
 
         {/* Desktop links */}
