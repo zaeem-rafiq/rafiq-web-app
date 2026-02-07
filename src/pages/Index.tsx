@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import CountdownTimer from "@/components/CountdownTimer";
+import rafiqLogo from "@/assets/rafiq-logo.png";
 
 const features = [
   {
@@ -185,12 +186,7 @@ export default function Index() {
       {/* Footer */}
       <footer className="border-t border-border/60 px-4 py-10">
         <div className="container mx-auto flex flex-col items-center gap-4 text-center">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <span className="font-serif text-sm font-bold text-primary-foreground">ر</span>
-            </div>
-            <span className="font-serif text-lg font-bold text-foreground">Rafiq</span>
-          </div>
+          <img src={rafiqLogo} alt="Rafiq" className="h-10 w-auto" />
           <p className="text-sm text-muted-foreground">
             Launching Ramadan 2026 · North America's Islamic Wealth Platform
           </p>
