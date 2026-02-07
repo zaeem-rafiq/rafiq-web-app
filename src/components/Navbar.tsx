@@ -16,11 +16,14 @@ export default function Navbar() {
   const location = useLocation();
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-lg">
+    <nav className="sticky top-0 z-50 border-b border-border/40 bg-card/95 backdrop-blur-lg">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2">
-          <img src={rafiqLogo} alt="Rafiq" className="h-9 w-auto" />
+        <Link to="/" className="flex items-center gap-2.5">
+          <img src={rafiqLogo} alt="Rafiq" className="h-8 w-auto" />
+          <span className="font-ui text-lg font-semibold tracking-tight text-foreground">
+            rafiq
+          </span>
         </Link>
 
         {/* Desktop links */}
@@ -31,7 +34,7 @@ export default function Navbar() {
               <li key={link.to}>
                 <Link
                   to={link.to}
-                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  className={`rounded-full px-4 py-2 font-ui text-sm font-medium transition-colors ${
                     active
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -62,7 +65,7 @@ export default function Navbar() {
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden border-t border-border/60 md:hidden"
+            className="overflow-hidden border-t border-border/40 bg-card md:hidden"
           >
             <ul className="flex flex-col gap-1 px-4 py-3">
               {navLinks.map((link) => {
@@ -72,7 +75,7 @@ export default function Navbar() {
                     <Link
                       to={link.to}
                       onClick={() => setOpen(false)}
-                      className={`block rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+                      className={`block rounded-lg px-4 py-2.5 font-ui text-sm font-medium transition-colors ${
                         active
                           ? "bg-primary text-primary-foreground"
                           : "text-muted-foreground hover:bg-muted hover:text-foreground"
