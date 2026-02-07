@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { loadScreenerData, searchStocks, findStock, type HalalStock } from "@/data/halal-stocks";
+import { loadScreenerData, searchStocks, findStock, getHaramReason, KNOWN_HARAM_SYMBOLS, type HalalStock } from "@/data/halal-stocks";
+import { Progress } from "@/components/ui/progress";
 
 const statusConfig = {
   HALAL: { color: "bg-halal text-white", icon: CheckCircle2, label: "HALAL" },
@@ -12,11 +13,110 @@ const statusConfig = {
   QUESTIONABLE: { color: "bg-questionable text-white", icon: AlertTriangle, label: "QUESTIONABLE" },
 };
 
+function RatioCard({
+  label,
+  value,
+  threshold,
+  unit,
+  pass,
+  note,
+}: {
+  label: string;
+  value: string;
+  threshold: string;
+  unit: string;
+  pass: boolean | null; // null = N/A
+  note?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="font-ui text-sm font-medium text-foreground">{label}</span>
+        {pass === true ? (
+          <CheckCircle2 className="h-5 w-5 text-halal" />
+        ) : pass === false ? (
+          <XCircle className="h-5 w-5 text-haram" />
+        ) : (
+          <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+        )}
+      </div>
+      <div className="mb-2 font-heading text-2xl font-bold text-foreground">
+        {value}
+      </div>
+      <Progress
+        value={pass === true ? 20 : pass === false ? 100 : 0}
+        className={`h-2 ${pass === true ? "bg-muted [&>div]:bg-halal" : pass === false ? "bg-muted [&>div]:bg-haram" : "bg-muted [&>div]:bg-muted-foreground/30"}`}
+      />
+      <p className="mt-2 text-xs text-muted-foreground">
+        {note || `Threshold: ${unit} ${threshold}`}
+      </p>
+    </div>
+  );
+}
+
+function ScreeningCriteria({ stock }: { stock: HalalStock }) {
+  const isHalal = stock.status === "HALAL";
+  const isHaram = stock.status === "NOT HALAL";
+
+  if (isHalal) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        <RatioCard label="Debt Ratio" value="PASS" threshold="33%" unit="<" pass={true} note="Passed DJIM screening" />
+        <RatioCard label="Interest Income" value="PASS" threshold="5%" unit="<" pass={true} note="Passed DJIM screening" />
+        <RatioCard label="Cash & Securities" value="PASS" threshold="33%" unit="<" pass={true} note="Passed DJIM screening" />
+        <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-ui text-sm font-medium text-foreground">Business Activity</span>
+            <CheckCircle2 className="h-5 w-5 text-halal" />
+          </div>
+          <div className="font-heading text-2xl font-bold text-foreground">PASS</div>
+          <p className="mt-2 text-xs text-muted-foreground">Core business is Shariah-compliant</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isHaram) {
+    const reason = getHaramReason(stock.symbol);
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        <RatioCard label="Debt Ratio" value="FAIL" threshold="33%" unit="<" pass={false} note="Excluded — haram industry" />
+        <RatioCard label="Interest Income" value="FAIL" threshold="5%" unit="<" pass={false} note="Excluded — haram industry" />
+        <RatioCard label="Cash & Securities" value="FAIL" threshold="33%" unit="<" pass={false} note="Excluded — haram industry" />
+        <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-ui text-sm font-medium text-foreground">Business Activity</span>
+            <XCircle className="h-5 w-5 text-haram" />
+          </div>
+          <div className="font-heading text-2xl font-bold text-foreground">FAIL</div>
+          <p className="mt-2 text-xs text-muted-foreground">{reason}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // QUESTIONABLE / fallback
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <RatioCard label="Debt Ratio" value="N/A" threshold="33%" unit="<" pass={null} note="Not in curated index" />
+      <RatioCard label="Interest Income" value="N/A" threshold="5%" unit="<" pass={null} note="Not in curated index" />
+      <RatioCard label="Cash & Securities" value="N/A" threshold="33%" unit="<" pass={null} note="Not in curated index" />
+      <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="font-ui text-sm font-medium text-foreground">Business Activity</span>
+          <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <div className="font-heading text-2xl font-bold text-foreground">N/A</div>
+        <p className="mt-2 text-xs text-muted-foreground">Not in curated index</p>
+      </div>
+    </div>
+  );
+}
+
 export default function Screener() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<HalalStock | null>(null);
   const [suggestions, setSuggestions] = useState<HalalStock[]>([]);
-  const [notFound, setNotFound] = useState(false);
   const [dataReady, setDataReady] = useState(false);
 
   // Pre-load the DJIM dataset on mount
@@ -26,7 +126,7 @@ export default function Screener() {
 
   const handleSearch = useCallback(async (val: string) => {
     setQuery(val);
-    setNotFound(false);
+
     if (val.trim().length >= 1) {
       const results = await searchStocks(val);
       setSuggestions(results.slice(0, 8));
@@ -39,7 +139,7 @@ export default function Screener() {
     setSelected(stock);
     setQuery(stock.symbol);
     setSuggestions([]);
-    setNotFound(false);
+
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,13 +148,20 @@ export default function Screener() {
     if (found) {
       setSelected(found);
       setSuggestions([]);
-      setNotFound(false);
+  
     } else if (suggestions.length > 0) {
       selectStock(suggestions[0]);
-    } else {
-      setSelected(null);
+    } else if (query.trim()) {
+      // Tier 3 — unknown stock: show with N/A criteria
+      setSelected({
+        symbol: query.toUpperCase().trim(),
+        name: "Unknown Stock",
+        sector: "Unknown",
+        status: "QUESTIONABLE",
+        type: "stock",
+      });
       setSuggestions([]);
-      setNotFound(true);
+  
     }
   };
 
@@ -146,48 +253,15 @@ export default function Screener() {
               </CardContent>
             </Card>
 
-            {/* Status explanation */}
+            {/* AAOIFI Screening Criteria */}
             <Card className="border-border/50 bg-card shadow-sm">
               <CardHeader className="pb-4">
-                <CardTitle className="font-heading text-lg">Screening Result</CardTitle>
+                <CardTitle className="font-heading text-lg">AAOIFI Screening Criteria</CardTitle>
               </CardHeader>
               <CardContent>
-                {selected.status === "HALAL" ? (
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    <strong className="text-foreground">{selected.symbol}</strong> is included in the
-                    Dow Jones Islamic Market (DJIM) index, meaning it has passed Shariah screening
-                    criteria including debt ratio, interest income, and business activity checks.
-                  </p>
-                ) : (
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    <strong className="text-foreground">{selected.symbol}</strong> is classified as{" "}
-                    <strong className="text-haram">NOT HALAL</strong> because its core business involves
-                    activities that are not permissible under Shariah law (e.g. conventional banking,
-                    alcohol, tobacco, gambling, or weapons manufacturing).
-                  </p>
-                )}
+                <ScreeningCriteria stock={selected} />
               </CardContent>
             </Card>
-          </motion.div>
-        ) : notFound ? (
-          <motion.div
-            key="not-found"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex flex-col items-center gap-4 py-20 text-center"
-          >
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-              <AlertTriangle className="h-8 w-8 text-questionable" />
-            </div>
-            <p className="font-heading text-lg font-semibold text-muted-foreground">
-              Stock not found in our database
-            </p>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              "{query.toUpperCase()}" was not found in the DJIM index or our known haram list.
-              This doesn't mean it's halal or haram — please consult a qualified scholar or
-              check the AAOIFI screening criteria manually.
-            </p>
           </motion.div>
         ) : (
           <motion.div

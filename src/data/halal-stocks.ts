@@ -34,6 +34,23 @@ export const KNOWN_HARAM_SYMBOLS = new Set([
   "LMT", "RTX", "NOC", "BA", "GD", "HII", "SWBI", "RGR",
 ]);
 
+// Map haram symbols to their exclusion reason for the Business Activity card.
+const HARAM_BANKS = new Set(["C", "JPM", "BAC", "WFC", "GS", "MS", "USB", "PNC", "COF", "SCHW", "BRK.B", "AIG", "MET", "PRU", "ALL", "TRV"]);
+const HARAM_ALCOHOL = new Set(["DEO", "BUD", "STZ"]);
+const HARAM_TOBACCO = new Set(["PM", "MO", "BATS"]);
+const HARAM_GAMBLING = new Set(["MGM", "LVS", "WYNN", "DKNG", "FLUT", "CZR"]);
+const HARAM_WEAPONS = new Set(["LMT", "RTX", "NOC", "BA", "GD", "HII", "SWBI", "RGR"]);
+
+export function getHaramReason(symbol: string): string {
+  const sym = symbol.toUpperCase().trim();
+  if (HARAM_BANKS.has(sym)) return "Conventional Banking / Insurance";
+  if (HARAM_ALCOHOL.has(sym)) return "Alcohol Production / Distribution";
+  if (HARAM_TOBACCO.has(sym)) return "Tobacco Production";
+  if (HARAM_GAMBLING.has(sym)) return "Gambling / Betting";
+  if (HARAM_WEAPONS.has(sym)) return "Weapons Manufacturing";
+  return "Prohibited Industry";
+}
+
 let _cache: HalalStock[] | null = null;
 let _loading: Promise<HalalStock[]> | null = null;
 
