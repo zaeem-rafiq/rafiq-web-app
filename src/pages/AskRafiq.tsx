@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { httpsCallable, functions } from "@/lib/firebase";
+import { findStock } from "@/data/halal-stocks";
 import rafiqLogo from "@/assets/rafiq-logo.png";
 
 interface Msg {
@@ -20,6 +21,41 @@ const suggestedQuestions = [
 ];
 
 const askRafiq = httpsCallable(functions, "askRafiqWeb");
+
+const COMMON_WORDS = new Set([
+  "I", "A", "IS", "IT", "OR", "AN", "AM", "IF", "IN", "AI", "MY", "DO", "SO",
+  "NO", "BE", "BY", "TO", "UP", "OF", "AT", "ON", "AS", "WE", "US", "OK", "GO",
+  "HE", "ME", "THE", "AND", "FOR", "ARE", "BUT", "NOT", "YOU", "ALL", "CAN",
+  "HAS", "HER", "WAS", "ONE", "OUR", "HOW", "ETF", "IPO",
+]);
+
+function buildStockContext(text: string): string {
+  const tickers = text.match(/\b[A-Z]{1,5}\b/g);
+  if (!tickers) return "";
+
+  const seen = new Set<string>();
+  const contexts: string[] = [];
+
+  for (const ticker of tickers) {
+    if (seen.has(ticker) || COMMON_WORDS.has(ticker)) continue;
+    seen.add(ticker);
+
+    const stock = findStock(ticker);
+    if (stock) {
+      if (stock.status === "HALAL") {
+        contexts.push(`[CONTEXT: ${stock.symbol} (${stock.name}) is in the Dow Jones Islamic Market Shariah Index, sector: ${stock.sector}. It has passed DJIM screening criteria including debt ratio, interest income, and cash & securities thresholds. Source: DJIM Index, last updated 2026-02-06.]`);
+      } else if (stock.status === "NOT HALAL") {
+        contexts.push(`[CONTEXT: ${stock.symbol} (${stock.name}) is NOT in the DJIM Shariah Index. Industry: ${stock.sector}. It failed screening due to non-compliant business activity. Source: DJIM Index, last updated 2026-02-06.]`);
+      } else {
+        contexts.push(`[CONTEXT: ${stock.symbol} (${stock.name}) has a QUESTIONABLE status in DJIM screening, sector: ${stock.sector}. Some financial ratios are near thresholds. Source: DJIM Index, last updated 2026-02-06.]`);
+      }
+    } else {
+      contexts.push(`[CONTEXT: ${ticker} was not found in the curated DJIM index dataset. It may still be halal or haram — advise the user to check further.]`);
+    }
+  }
+
+  return contexts.join("\n");
+}
 
 function TypingIndicator() {
   return (
@@ -56,7 +92,11 @@ export default function AskRafiq() {
 
     try {
       const conversationHistory = updatedMessages.map(({ role, content }) => ({ role, content }));
-      const result = await askRafiq({ message: text.trim(), conversationHistory });
+      const stockContext = buildStockContext(text.trim());
+      const enrichedMessage = stockContext
+        ? `${stockContext}\n\n${text.trim()}`
+        : text.trim();
+      const result = await askRafiq({ message: enrichedMessage, conversationHistory });
       const response = (result.data as { response: string }).response;
       setMessages((prev) => [...prev, { role: "assistant", content: response }]);
     } catch (e) {
