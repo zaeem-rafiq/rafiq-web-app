@@ -3,21 +3,40 @@ import { Mail, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function WaitlistSection() {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleWaitlist = (e: React.FormEvent) => {
+  const handleWaitlist = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
-    setSubmitted(true);
-    toast({
-      title: "You're on the list! 🎉",
-      description: "We'll notify you when Rafiq launches this Ramadan.",
-    });
-    setEmail("");
+    if (!email.trim() || loading) return;
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "waitlist"), {
+        email: email.trim(),
+        createdAt: serverTimestamp(),
+      });
+      setSubmitted(true);
+      toast({
+        title: "You're on the list!",
+        description: "We'll notify you when Rafiq launches this Ramadan.",
+      });
+      setEmail("");
+    } catch (err) {
+      console.error("Waitlist error:", err);
+      toast({
+        title: "Something went wrong",
+        description: "Please try again in a moment.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -46,10 +65,11 @@ export default function WaitlistSection() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={loading}
               className="flex-1 bg-card"
             />
-            <Button type="submit" className="gap-2 font-ui font-semibold hover:bg-primary/90">
-              Join the Waitlist <ArrowRight size={16} />
+            <Button type="submit" disabled={loading} className="gap-2 font-ui font-semibold hover:bg-primary/90">
+              {loading ? "Joining..." : "Join the Waitlist"} <ArrowRight size={16} />
             </Button>
           </form>
         )}
