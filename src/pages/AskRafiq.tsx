@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { httpsCallable, functions } from "@/lib/firebase";
-import { findStock } from "@/data/halal-stocks";
+import { findStock, halalStocks } from "@/data/halal-stocks";
 import rafiqLogo from "@/assets/rafiq-logo.png";
 
 interface Msg {
@@ -92,10 +92,20 @@ export default function AskRafiq() {
 
     try {
       const conversationHistory = updatedMessages.map(({ role, content }) => ({ role, content }));
-      const stockContext = buildStockContext(text.trim());
+      const rawText = text.trim();
+      const extractedTickers = rawText.match(/\b[A-Z]{1,5}\b/g);
+      const stockContext = buildStockContext(rawText);
       const enrichedMessage = stockContext
-        ? `${stockContext}\n\n${text.trim()}`
-        : text.trim();
+        ? `${stockContext}\n\n${rawText}`
+        : rawText;
+      console.log("[AskRafiq debug]", {
+        input: rawText,
+        extractedTickers,
+        djimDataLoaded: halalStocks.length > 0,
+        djimStockCount: halalStocks.length,
+        stockContext: stockContext || "(none)",
+        enrichedMessage,
+      });
       const result = await askRafiq({ message: enrichedMessage, conversationHistory });
       const response = (result.data as { response: string }).response;
       setMessages((prev) => [...prev, { role: "assistant", content: response }]);
