@@ -17,7 +17,7 @@ import {
 
 const madhabs: Madhab[] = ["Hanafi", "Shafi'i", "Maliki", "Hanbali", "Ja'fari"];
 
-const FALLBACK_PRICES: MetalPrices = { goldPerGram: 75.5, silverPerGram: 0.92 };
+const FALLBACK_PRICES: MetalPrices = { goldPerGram: 88.0, silverPerGram: 1.05 };
 
 export default function Zakat() {
   const [step, setStep] = useState(1);
@@ -25,6 +25,7 @@ export default function Zakat() {
   const [nisabStandard, setNisabStandard] = useState<NisabStandard>("gold");
   const [prices, setPrices] = useState<MetalPrices>(FALLBACK_PRICES);
   const [pricesLoading, setPricesLoading] = useState(true);
+  const [pricesLive, setPricesLive] = useState(false);
   const [assets, setAssets] = useState<ZakatAssets>({
     cash: 0,
     gold: 0,
@@ -40,18 +41,15 @@ export default function Zakat() {
     async function fetchPrices() {
       try {
         const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/metal-prices`,
-          {
-            headers: {
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-              "Content-Type": "application/json",
-            },
-          }
+          "https://api.metals.dev/v1/latest?api_key=demo&currency=USD&unit=gram"
         );
         if (resp.ok) {
           const data = await resp.json();
-          if (data.goldPerGram && data.silverPerGram) {
-            setPrices({ goldPerGram: data.goldPerGram, silverPerGram: data.silverPerGram });
+          const gold = data.metals?.gold;
+          const silver = data.metals?.silver;
+          if (gold && silver) {
+            setPrices({ goldPerGram: gold, silverPerGram: silver });
+            setPricesLive(true);
           }
         }
       } catch {
@@ -222,8 +220,11 @@ export default function Zakat() {
                 {!pricesLoading && (
                   <div className="rounded-2xl bg-muted/30 p-4 text-xs text-muted-foreground">
                     <DollarSign className="mr-1 inline h-3 w-3" />
-                    Live prices: Gold {fmt(prices.goldPerGram)}/g · Silver{" "}
+                    Gold {fmt(prices.goldPerGram)}/g · Silver{" "}
                     {fmt(prices.silverPerGram)}/g
+                    <span className="ml-2 opacity-70">
+                      ({pricesLive ? "Live prices" : "Estimated prices"})
+                    </span>
                   </div>
                 )}
 
