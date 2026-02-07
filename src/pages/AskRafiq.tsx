@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import rafiqLogo from "@/assets/rafiq-logo.png";
 
 interface Msg {
   role: "user" | "assistant";
@@ -21,7 +22,7 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 function TypingIndicator() {
   return (
-    <div className="flex items-center gap-1 px-4 py-3">
+    <div className="flex items-center gap-1.5 px-4 py-3">
       {[0, 1, 2].map((i) => (
         <div
           key={i}
@@ -145,15 +146,13 @@ export default function AskRafiq() {
   return (
     <main className="flex h-[calc(100vh-4rem)] flex-col">
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
+      <div className="flex-1 overflow-y-auto px-4 py-8">
         <div className="container mx-auto max-w-2xl space-y-4">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center gap-4 py-12 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
-                <span className="font-serif text-2xl font-bold text-primary-foreground">ر</span>
-              </div>
-              <h2 className="font-serif text-2xl font-bold text-foreground">Ask Rafiq</h2>
-              <p className="max-w-sm text-sm text-muted-foreground">
+            <div className="flex flex-col items-center gap-5 py-16 text-center">
+              <img src={rafiqLogo} alt="Rafiq" className="h-16 w-auto" />
+              <h2 className="font-heading text-2xl font-bold text-foreground">Ask Rafiq</h2>
+              <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
                 Your AI-powered Islamic finance assistant. Ask about halal investing, zakat, and more.
               </p>
             </div>
@@ -168,10 +167,10 @@ export default function AskRafiq() {
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed sm:max-w-[70%] ${
+                  className={`max-w-[85%] rounded-2xl px-5 py-3.5 text-sm leading-relaxed sm:max-w-[70%] ${
                     msg.role === "user"
                       ? "bg-primary text-primary-foreground"
-                      : "border border-primary/20 bg-primary/5 text-foreground"
+                      : "border border-border/50 bg-card text-foreground shadow-sm"
                   }`}
                 >
                   {msg.role === "assistant" ? (
@@ -188,7 +187,7 @@ export default function AskRafiq() {
 
           {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
             <div className="flex justify-start">
-              <div className="rounded-2xl border border-primary/20 bg-primary/5">
+              <div className="rounded-2xl border border-border/50 bg-card shadow-sm">
                 <TypingIndicator />
               </div>
             </div>
@@ -199,7 +198,7 @@ export default function AskRafiq() {
       </div>
 
       {/* Bottom input area */}
-      <div className="border-t border-border/60 bg-background/80 backdrop-blur px-4 pb-4 pt-3">
+      <div className="border-t border-border/40 bg-card/80 px-4 pb-4 pt-3 backdrop-blur">
         <div className="container mx-auto max-w-2xl">
           {/* Suggested questions */}
           {messages.length === 0 && (
@@ -208,7 +207,7 @@ export default function AskRafiq() {
                 <button
                   key={q}
                   onClick={() => send(q)}
-                  className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                  className="rounded-full border border-border/50 bg-card px-4 py-2 font-ui text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:border-primary/30 hover:text-foreground"
                 >
                   {q}
                 </button>
@@ -228,13 +227,13 @@ export default function AskRafiq() {
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about Islamic finance..."
               disabled={isLoading}
-              className="flex-1 rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+              className="flex-1 rounded-2xl border border-border/50 bg-card px-5 py-3.5 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
             />
             <Button
               type="submit"
               size="icon"
               disabled={isLoading || !input.trim()}
-              className="h-12 w-12 shrink-0 rounded-xl"
+              className="h-12 w-12 shrink-0 rounded-2xl"
             >
               <Send size={18} />
             </Button>

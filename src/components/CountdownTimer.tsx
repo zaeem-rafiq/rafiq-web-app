@@ -35,19 +35,19 @@ export default function CountdownTimer() {
   ];
 
   return (
-    <div className="flex items-center justify-center gap-3 sm:gap-4">
+    <div className="flex items-center justify-center gap-2 sm:gap-3">
       {units.map((u, i) => (
-        <div key={u.label} className="flex items-center gap-3 sm:gap-4">
+        <div key={u.label} className="flex items-center gap-2 sm:gap-3">
           <div className="flex flex-col items-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary text-2xl font-bold text-primary-foreground shadow-lg sm:h-20 sm:w-20 sm:text-3xl">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary font-heading text-2xl font-bold text-primary-foreground shadow-lg sm:h-20 sm:w-20 sm:text-3xl">
               {String(u.value).padStart(2, "0")}
             </div>
-            <span className="mt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs">
+            <span className="mt-2 font-ui text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:text-xs">
               {u.label}
             </span>
           </div>
           {i < units.length - 1 && (
-            <span className="mb-5 text-xl font-bold text-accent sm:text-2xl">:</span>
+            <span className="mb-5 font-heading text-xl font-bold text-accent sm:text-2xl">:</span>
           )}
         </div>
       ))}
