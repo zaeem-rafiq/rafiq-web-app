@@ -2,95 +2,116 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Playfair+Display:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 60 56% 91%;
+    --foreground: 0 0% 15%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 60 40% 95%;
+    --card-foreground: 0 0% 15%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 60 40% 95%;
+    --popover-foreground: 0 0% 15%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 141 33% 26%;
+    --primary-foreground: 60 56% 95%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 60 30% 85%;
+    --secondary-foreground: 141 33% 20%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 60 20% 88%;
+    --muted-foreground: 0 0% 40%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 46 67% 47%;
+    --accent-foreground: 0 0% 10%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 60 20% 82%;
+    --input: 60 20% 82%;
+    --ring: 141 33% 26%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
+    --sidebar-background: 141 33% 22%;
+    --sidebar-foreground: 60 56% 95%;
+    --sidebar-primary: 46 67% 47%;
+    --sidebar-primary-foreground: 0 0% 10%;
+    --sidebar-accent: 141 25% 30%;
+    --sidebar-accent-foreground: 60 56% 95%;
+    --sidebar-border: 141 20% 35%;
+    --sidebar-ring: 46 67% 47%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Custom tokens */
+    --gold: 46 67% 47%;
+    --gold-foreground: 0 0% 10%;
+    --forest: 141 33% 26%;
+    --forest-light: 141 25% 35%;
+    --forest-dark: 141 35% 18%;
+    --cream: 60 56% 91%;
+    --cream-dark: 60 30% 85%;
+    --charcoal: 0 0% 15%;
+    --success: 141 50% 40%;
+    --warning: 46 80% 50%;
+    --halal: 141 50% 40%;
+    --haram: 0 72% 51%;
+    --questionable: 46 80% 50%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 141 30% 8%;
+    --foreground: 60 30% 90%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 141 25% 12%;
+    --card-foreground: 60 30% 90%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 141 25% 12%;
+    --popover-foreground: 60 30% 90%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 141 40% 45%;
+    --primary-foreground: 0 0% 5%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 141 20% 18%;
+    --secondary-foreground: 60 30% 90%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 141 15% 20%;
+    --muted-foreground: 60 15% 60%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 46 67% 47%;
+    --accent-foreground: 0 0% 5%;
 
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 141 15% 22%;
+    --input: 141 15% 22%;
+    --ring: 141 40% 45%;
+
+    --sidebar-background: 141 30% 6%;
+    --sidebar-foreground: 60 30% 90%;
+    --sidebar-primary: 46 67% 47%;
+    --sidebar-primary-foreground: 0 0% 5%;
+    --sidebar-accent: 141 20% 15%;
+    --sidebar-accent-foreground: 60 30% 90%;
+    --sidebar-border: 141 15% 18%;
+    --sidebar-ring: 46 67% 47%;
+
+    --gold: 46 67% 47%;
+    --gold-foreground: 0 0% 5%;
+    --forest: 141 40% 45%;
+    --forest-light: 141 30% 55%;
+    --forest-dark: 141 35% 30%;
+    --cream: 60 15% 15%;
+    --cream-dark: 60 10% 20%;
+    --charcoal: 60 30% 90%;
+    --success: 141 50% 45%;
+    --warning: 46 80% 50%;
+    --halal: 141 50% 45%;
+    --haram: 0 72% 51%;
+    --questionable: 46 80% 50%;
   }
 }
 
@@ -100,6 +121,11 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Playfair Display', Georgia, serif;
   }
 }
