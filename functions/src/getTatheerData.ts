@@ -8,6 +8,7 @@ const FMP_BASE = "https://financialmodelingprep.com/stable";
 interface FmpProfile {
   companyName?: string;
   lastDiv?: number;
+  lastDividend?: number;
   symbol?: string;
 }
 
@@ -29,6 +30,7 @@ interface FmpIncomeStatement {
 interface FmpSearchResult {
   symbol?: string;
   name?: string;
+  exchangeShortName?: string;
 }
 
 export const getTatheerData = onCall(
@@ -54,21 +56,61 @@ export const getTatheerData = onCall(
       );
     }
 
-    // Resolve user input (could be company name like "CUMMINS") to actual ticker symbol
+    // --- Resolve ticker ---
+    // If input matches valid ticker format (1-5 uppercase letters, optional dot suffix
+    // like BRK.B), use it directly. Calling search-name with a ticker like "AAPL"
+    // returns wrong results (e.g., "APLY" ETF whose name contains "AAPL").
+    // Only call FMP search APIs when input looks like a company name.
+    const VALID_TICKER = /^[A-Z]{1,5}(\.[A-Z]{1,2})?$/;
+    const isTickerFormat = VALID_TICKER.test(ticker);
     let resolvedTicker = ticker;
-    try {
-      const searchResp = await fetch(
-        `${FMP_BASE}/search-name?query=${encodeURIComponent(ticker)}&limit=1&apikey=${apiKey}`
-      );
-      if (searchResp.ok) {
-        const searchResults: FmpSearchResult[] = await searchResp.json();
-        if (searchResults?.[0]?.symbol) {
-          resolvedTicker = searchResults[0].symbol.toUpperCase();
-          console.log(`Resolved "${ticker}" to "${resolvedTicker}"`);
+
+    if (!isTickerFormat) {
+      // Input is NOT a ticker format — likely a company name (e.g., "VERIZON")
+      // Step 1: Try search-symbol (searches by ticker prefix, more precise)
+      let resolved = false;
+      try {
+        const symResp = await fetch(
+          `${FMP_BASE}/search-symbol?query=${encodeURIComponent(ticker)}&limit=1&apikey=${apiKey}`
+        );
+        if (symResp.ok) {
+          const symResults: FmpSearchResult[] = await symResp.json();
+          if (symResults?.[0]?.symbol) {
+            resolvedTicker = symResults[0].symbol.toUpperCase();
+            resolved = true;
+            console.log(`Resolved "${ticker}" -> "${resolvedTicker}" via search-symbol`);
+          }
+        }
+      } catch {
+        // Proceed to search-name fallback
+      }
+
+      // Step 2: If search-symbol didn't resolve, try search-name with US exchange filter
+      if (!resolved) {
+        try {
+          const nameResp = await fetch(
+            `${FMP_BASE}/search-name?query=${encodeURIComponent(ticker)}&limit=5&apikey=${apiKey}`
+          );
+          if (nameResp.ok) {
+            const nameResults: FmpSearchResult[] = await nameResp.json();
+            const US_EXCHANGES = new Set(["NYSE", "NASDAQ", "AMEX"]);
+            const usMatch = nameResults.find(
+              (r) => r.symbol && US_EXCHANGES.has(r.exchangeShortName ?? "")
+            );
+            if (usMatch?.symbol) {
+              resolvedTicker = usMatch.symbol.toUpperCase();
+              console.log(`Resolved "${ticker}" -> "${resolvedTicker}" via search-name (US exchange)`);
+            } else if (nameResults?.[0]?.symbol) {
+              resolvedTicker = nameResults[0].symbol.toUpperCase();
+              console.log(`Resolved "${ticker}" -> "${resolvedTicker}" via search-name (first result)`);
+            }
+          }
+        } catch {
+          console.log(`Name resolution failed for "${ticker}", using original input`);
         }
       }
-    } catch (err) {
-      console.log(`Ticker search failed for "${ticker}", using original input`);
+    } else {
+      console.log(`"${ticker}" is ticker format — using directly, no search API call`);
     }
 
     // Fetch all 3 endpoints in parallel using resolved ticker
@@ -85,7 +127,7 @@ export const getTatheerData = onCall(
       const profileData: FmpProfile[] = await profileResp.json();
       if (profileData?.[0]) {
         companyName = profileData[0].companyName || resolvedTicker;
-        lastDiv = profileData[0].lastDiv || 0;
+        lastDiv = profileData[0].lastDiv || profileData[0].lastDividend || 0;
       }
     }
 
@@ -155,6 +197,10 @@ export const getTatheerData = onCall(
       }
     } else {
       console.log("Income statement fetch failed:", incomeResp.status, incomeResp.statusText);
+      // Conservative fallback: 0.5% non-compliant ratio when income data unavailable.
+      // Better than 0% (zero purification) for stocks with some interest component.
+      nonCompliantRatio = 0.005;
+      console.log("Using conservative fallback nonCompliantRatio: 0.5%");
     }
 
     // --- Calculate purification ---
