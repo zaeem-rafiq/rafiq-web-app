@@ -26,7 +26,13 @@ import {
   type ZakatResult,
   calculateZakat,
 } from "@/lib/zakat-utils";
-import { loadDJIMData, type DJIMStock } from "@/data/halal-stocks";
+import {
+  loadDJIMData,
+  loadShariahIndex,
+  searchShariahByName,
+  type DJIMStock,
+  type ShariahIndexEntry,
+} from "@/data/halal-stocks";
 
 const madhabs: Madhab[] = ["Hanafi", "Shafi'i", "Maliki", "Hanbali", "Ja'fari"];
 
@@ -153,12 +159,15 @@ export default function Zakat() {
     annualPurification?: number;
     quarterlyPurification?: number;
     shares?: number;
+    resolvedTicker?: string;
+    inputWasResolved?: boolean;
   } | null>(null);
   const [tatheerError, setTatheerError] = useState<string | null>(null);
 
   // --- Ticker Autocomplete State ---
   const [tickerInput, setTickerInput] = useState("");
   const [djimStocks, setDjimStocks] = useState<DJIMStock[]>([]);
+  const [shariahIndex, setShariahIndex] = useState<ShariahIndexEntry[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -188,9 +197,10 @@ export default function Zakat() {
     fetchPrices();
   }, []);
 
-  // Load DJIM data on mount
+  // Load DJIM data + full Shariah index on mount
   useEffect(() => {
     loadDJIMData().then(setDjimStocks);
+    loadShariahIndex().then(setShariahIndex);
   }, []);
 
   // Close dropdown on outside click
@@ -204,10 +214,15 @@ export default function Zakat() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Filter DJIM stocks based on input
+  // Filter stocks based on input — use full Shariah index (2,127 stocks with names) for Tatheer
   const isExactTicker = /^[A-Z]{1,5}$/.test(tickerInput);
-  const filteredStocks = (() => {
+  const filteredStocks: DJIMStock[] = (() => {
     if (!tickerInput.trim() || isExactTicker) return [];
+    // Search the full Shariah index by name (returns DJIMStock-shaped results)
+    if (shariahIndex.length > 0) {
+      return searchShariahByName(tickerInput, shariahIndex).slice(0, 8);
+    }
+    // Fallback to djimStocks if index hasn't loaded yet
     const q = tickerInput.toLowerCase();
     return djimStocks
       .filter(
@@ -223,13 +238,13 @@ export default function Zakat() {
       setTickerInput(value);
       const upper = value.trim().toUpperCase();
       if (/^[A-Z]{1,5}$/.test(upper)) {
-        // Check if it's a known DJIM ticker symbol
-        const isKnownTicker = djimStocks.some(s => s.symbol === upper);
-        // Also check if the input matches any company name
+        // Check if it's a known ticker in the full Shariah index (2,127 stocks)
+        const isKnownTicker =
+          shariahIndex.some(s => s.symbol === upper) ||
+          djimStocks.some(s => s.symbol === upper);
+        // Also check if the input matches any company name in the full index
         const q = value.trim().toLowerCase();
-        const nameMatches = djimStocks.filter(s =>
-          s.name.toLowerCase().includes(q) || s.symbol.toLowerCase().includes(q)
-        );
+        const nameMatches = searchShariahByName(q, shariahIndex);
         if (isKnownTicker && nameMatches.length <= 1) {
           // Unambiguous known ticker (e.g., "AAPL") — lock it in
           setTicker(upper);
@@ -248,7 +263,7 @@ export default function Zakat() {
         setShowDropdown(value.trim().length > 0);
       }
     },
-    [djimStocks],
+    [djimStocks, shariahIndex],
   );
 
   const handleSuggestionClick = useCallback(
@@ -276,24 +291,38 @@ export default function Zakat() {
   const handleTatheerLookup = async () => {
     // Resolve ticker from either ticker state or tickerInput
     let resolvedTicker = ticker.trim().toUpperCase();
+    let wasResolvedFromIndex = false;
 
-    if (/^[A-Z]{1,5}$/.test(resolvedTicker)) {
+    if (/^[A-Z]{1,5}(\.[A-Z]{1,2})?$/.test(resolvedTicker)) {
       // ticker is already a valid symbol, use directly
     } else if (tickerInput.trim()) {
-      // Try to resolve from djimStocks by name
       const q = tickerInput.trim().toLowerCase();
-      const match = djimStocks.find(s =>
-        s.name.toLowerCase().includes(q) || s.symbol.toLowerCase() === q
+
+      // Step 1: Try to resolve from full Shariah index (2,127 stocks with names)
+      const indexMatch = shariahIndex.find(s =>
+        s.name?.toLowerCase().includes(q) || s.symbol.toLowerCase() === q
       );
-      if (match) {
-        resolvedTicker = match.symbol;
+      if (indexMatch) {
+        resolvedTicker = indexMatch.symbol;
+        wasResolvedFromIndex = true;
+        console.log(`Resolved "${tickerInput}" -> "${resolvedTicker}" via Shariah index (${indexMatch.name})`);
       } else {
-        // Fallback: clean company name and send to API (FMP search will resolve)
-        // Strip common suffixes that confuse FMP search
-        const cleaned = tickerInput.trim()
-          .replace(/\b(Inc\.?|Corp\.?|Co\.?|Ltd\.?|LLC|PLC|Group|Company|Corporation|Incorporated)\s*$/i, "")
-          .trim();
-        resolvedTicker = (cleaned || tickerInput.trim()).toUpperCase();
+        // Step 2: Try djimStocks (62 curated stocks)
+        const djimMatch = djimStocks.find(s =>
+          s.name.toLowerCase().includes(q) || s.symbol.toLowerCase() === q
+        );
+        if (djimMatch) {
+          resolvedTicker = djimMatch.symbol;
+          wasResolvedFromIndex = true;
+          console.log(`Resolved "${tickerInput}" -> "${resolvedTicker}" via djimStocks (${djimMatch.name})`);
+        } else {
+          // Step 3: Fallback — clean company name and send to CF (FMP search will resolve)
+          const cleaned = tickerInput.trim()
+            .replace(/\b(Inc\.?|Corp\.?|Co\.?|Ltd\.?|LLC|PLC|Group|Company|Corporation|Incorporated)\s*$/i, "")
+            .trim();
+          resolvedTicker = (cleaned || tickerInput.trim()).toUpperCase();
+          console.log(`No local match for "${tickerInput}", sending "${resolvedTicker}" to Cloud Function`);
+        }
       }
     } else {
       return; // Nothing to look up
@@ -302,7 +331,7 @@ export default function Zakat() {
     // Use tickerInput for display fallback (user-friendly name)
     const displayFallback = tickerInput.trim() || resolvedTicker;
 
-    console.log("djimStocks length:", djimStocks.length, "resolvedTicker:", resolvedTicker);
+    console.log("shariahIndex length:", shariahIndex.length, "resolvedTicker:", resolvedTicker);
     setTatheerLoading(true);
     setTatheerError(null);
     setTatheerData(null);
@@ -316,8 +345,16 @@ export default function Zakat() {
       console.log("getTatheerData raw response:", raw);
       console.log("getTatheerData unwrapped data:", data);
 
+      // Determine if CF used FMP search to resolve (not resolved locally)
+      const cfResolved = !wasResolvedFromIndex && (data.inputWasResolved === true);
+
       if (data.hasDividend === false) {
-        setTatheerData({ hasDividend: false, companyName: data.companyName || displayFallback });
+        setTatheerData({
+          hasDividend: false,
+          companyName: data.companyName || displayFallback,
+          resolvedTicker: data.resolvedTicker || resolvedTicker,
+          inputWasResolved: cfResolved,
+        });
       } else {
         setTatheerData({
           hasDividend: true,
@@ -330,6 +367,8 @@ export default function Zakat() {
           annualPurification: Number(data.annualPurification) || 0,
           quarterlyPurification: Number(data.quarterlyPurification) || 0,
           shares: Number(data.shares) || 0,
+          resolvedTicker: data.resolvedTicker || resolvedTicker,
+          inputWasResolved: cfResolved,
         });
       }
     } catch (err) {
@@ -796,6 +835,18 @@ export default function Zakat() {
                   animate={{ opacity: 1, y: 0 }}
                   className="space-y-4"
                 >
+                  {/* Resolution confirmation banner — shown when CF used FMP search */}
+                  {tatheerData.inputWasResolved && (
+                    <div className="flex gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                      <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                      <p className="text-sm text-blue-800">
+                        Resolved to: <strong>{tatheerData.companyName}</strong>
+                        {tatheerData.resolvedTicker && ` (${tatheerData.resolvedTicker})`}.
+                        If incorrect, try entering the ticker symbol directly.
+                      </p>
+                    </div>
+                  )}
+
                   <h3 className="font-heading text-sm font-semibold text-foreground">
                     Results for {tatheerData.companyName}
                   </h3>

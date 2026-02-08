@@ -33,6 +33,17 @@ interface FmpSearchResult {
   exchangeShortName?: string;
 }
 
+/**
+ * Check if a candidate company name reasonably matches the user's query.
+ * E.g., query "VERIZON" should match "Verizon Communications Inc." but NOT "Vertiv Holdings".
+ */
+function isReasonableNameMatch(query: string, candidateName: string): boolean {
+  const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
+  const name = candidateName.toLowerCase();
+  // At least one significant word from the query must appear in the candidate name
+  return queryWords.some(word => name.includes(word));
+}
+
 export const getTatheerData = onCall(
   { secrets: [fmpApiKey] },
   async (request) => {
@@ -85,24 +96,46 @@ export const getTatheerData = onCall(
         // Proceed to search-name fallback
       }
 
-      // Step 2: If search-symbol didn't resolve, try search-name with US exchange filter
+      // Step 2: If search-symbol didn't resolve, try search-name with US exchange filter + name validation
       if (!resolved) {
         try {
           const nameResp = await fetch(
-            `${FMP_BASE}/search-name?query=${encodeURIComponent(ticker)}&limit=5&apikey=${apiKey}`
+            `${FMP_BASE}/search-name?query=${encodeURIComponent(ticker)}&limit=10&apikey=${apiKey}`
           );
           if (nameResp.ok) {
             const nameResults: FmpSearchResult[] = await nameResp.json();
             const US_EXCHANGES = new Set(["NYSE", "NASDAQ", "AMEX"]);
-            const usMatch = nameResults.find(
-              (r) => r.symbol && US_EXCHANGES.has(r.exchangeShortName ?? "")
+
+            // Priority 1: US exchange + name matches user query
+            const validatedUSMatch = nameResults.find(
+              (r) => r.symbol &&
+                US_EXCHANGES.has(r.exchangeShortName ?? "") &&
+                isReasonableNameMatch(ticker, r.name ?? "")
             );
-            if (usMatch?.symbol) {
-              resolvedTicker = usMatch.symbol.toUpperCase();
-              console.log(`Resolved "${ticker}" -> "${resolvedTicker}" via search-name (US exchange)`);
-            } else if (nameResults?.[0]?.symbol) {
-              resolvedTicker = nameResults[0].symbol.toUpperCase();
-              console.log(`Resolved "${ticker}" -> "${resolvedTicker}" via search-name (first result)`);
+            if (validatedUSMatch?.symbol) {
+              resolvedTicker = validatedUSMatch.symbol.toUpperCase();
+              console.log(`Resolved "${ticker}" -> "${resolvedTicker}" via search-name (validated US: "${validatedUSMatch.name}")`);
+            } else {
+              // Priority 2: Any exchange + name matches user query
+              const validatedAnyMatch = nameResults.find(
+                (r) => r.symbol && isReasonableNameMatch(ticker, r.name ?? "")
+              );
+              if (validatedAnyMatch?.symbol) {
+                resolvedTicker = validatedAnyMatch.symbol.toUpperCase();
+                console.log(`Resolved "${ticker}" -> "${resolvedTicker}" via search-name (validated any: "${validatedAnyMatch.name}")`);
+              } else {
+                // Priority 3: First US exchange result (unvalidated fallback)
+                const usMatch = nameResults.find(
+                  (r) => r.symbol && US_EXCHANGES.has(r.exchangeShortName ?? "")
+                );
+                if (usMatch?.symbol) {
+                  resolvedTicker = usMatch.symbol.toUpperCase();
+                  console.log(`WARNING: Resolved "${ticker}" -> "${resolvedTicker}" via search-name (unvalidated US fallback: "${usMatch.name}")`);
+                } else if (nameResults?.[0]?.symbol) {
+                  resolvedTicker = nameResults[0].symbol.toUpperCase();
+                  console.log(`WARNING: Resolved "${ticker}" -> "${resolvedTicker}" via search-name (unvalidated first result: "${nameResults[0].name}")`);
+                }
+              }
             }
           }
         } catch {
@@ -222,6 +255,8 @@ export const getTatheerData = onCall(
       shares: numShares,
       dataSource: "fmp",
       hasDividend,
+      resolvedTicker,
+      inputWasResolved: !isTickerFormat,
     };
 
     console.log("getTatheerData result:", JSON.stringify(result));
