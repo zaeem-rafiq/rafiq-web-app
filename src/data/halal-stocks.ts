@@ -56,6 +56,7 @@ export const halalStocks: HalalStock[] = [
 
 export interface ShariahIndexEntry {
   symbol: string;
+  name?: string;
   sector: string;
   region: string;
 }
@@ -106,7 +107,9 @@ export function searchExtended(
   );
 
   const indexMatches = index.filter(
-    (s) => !localSymbols.has(s.symbol) && s.symbol.includes(q)
+    (s) =>
+      !localSymbols.has(s.symbol) &&
+      (s.symbol.includes(q) || (s.name?.toUpperCase().includes(q) ?? false))
   );
 
   return [...localMatches, ...indexMatches];
@@ -115,6 +118,28 @@ export function searchExtended(
 export function findStock(symbol: string): HalalStock | undefined {
   return halalStocks.find((s) => s.symbol === symbol.toUpperCase().trim());
 }
+
+/**
+ * Search the full Shariah index (2,127 entries) by both symbol and company name.
+ * Returns DJIMStock-shaped results for compatibility with the Tatheer autocomplete.
+ */
+export function searchShariahByName(
+  query: string,
+  index: ShariahIndexEntry[]
+): DJIMStock[] {
+  const q = query.toLowerCase().trim();
+  if (!q) return [];
+  return index
+    .filter(
+      (s) =>
+        s.symbol.toLowerCase().includes(q) ||
+        (s.name?.toLowerCase().includes(q) ?? false)
+    )
+    .slice(0, 10)
+    .map((s) => ({ symbol: s.symbol, name: s.name || s.symbol, sector: s.sector }));
+}
+
+export { loadDJIMData, type DJIMStock } from "./djim-stocks";
 
 export function findInIndex(
   symbol: string,
