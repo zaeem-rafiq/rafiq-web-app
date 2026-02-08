@@ -54,6 +54,35 @@ export const halalStocks: HalalStock[] = [
   { symbol: "MRNA", name: "Moderna Inc.", sector: "Healthcare", status: "HALAL", ratios: { debtRatio: 5.1, interestIncome: 2.5, cashSecurities: 30.8, businessActivity: "PASS" } },
 ];
 
+export interface ShariahIndexEntry {
+  symbol: string;
+  sector: string;
+  region: string;
+}
+
+interface ScreenerData {
+  shariahIndexDetailed: ShariahIndexEntry[];
+}
+
+let cachedIndex: ShariahIndexEntry[] | null = null;
+let fetchPromise: Promise<ShariahIndexEntry[]> | null = null;
+
+export async function loadShariahIndex(): Promise<ShariahIndexEntry[]> {
+  if (cachedIndex) return cachedIndex;
+  if (fetchPromise) return fetchPromise;
+  fetchPromise = fetch("/halal_screener_data.json")
+    .then((r) => r.json())
+    .then((data: ScreenerData) => {
+      cachedIndex = data.shariahIndexDetailed ?? [];
+      return cachedIndex;
+    })
+    .catch(() => {
+      cachedIndex = [];
+      return cachedIndex;
+    });
+  return fetchPromise;
+}
+
 export function searchStocks(query: string): HalalStock[] {
   if (!query.trim()) return [];
   const q = query.toUpperCase().trim();
@@ -64,6 +93,37 @@ export function searchStocks(query: string): HalalStock[] {
   );
 }
 
+export function searchExtended(
+  query: string,
+  index: ShariahIndexEntry[]
+): (HalalStock | ShariahIndexEntry)[] {
+  if (!query.trim()) return [];
+  const q = query.toUpperCase().trim();
+  const localSymbols = new Set(halalStocks.map((s) => s.symbol));
+
+  const localMatches = halalStocks.filter(
+    (s) => s.symbol.includes(q) || s.name.toUpperCase().includes(q)
+  );
+
+  const indexMatches = index.filter(
+    (s) => !localSymbols.has(s.symbol) && s.symbol.includes(q)
+  );
+
+  return [...localMatches, ...indexMatches];
+}
+
 export function findStock(symbol: string): HalalStock | undefined {
   return halalStocks.find((s) => s.symbol === symbol.toUpperCase().trim());
+}
+
+export function findInIndex(
+  symbol: string,
+  index: ShariahIndexEntry[]
+): ShariahIndexEntry | undefined {
+  const s = symbol.toUpperCase().trim();
+  return index.find((entry) => entry.symbol === s);
+}
+
+export function isHalalStock(item: HalalStock | ShariahIndexEntry): item is HalalStock {
+  return "status" in item;
 }
