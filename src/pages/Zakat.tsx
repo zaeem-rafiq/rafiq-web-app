@@ -143,9 +143,15 @@ export default function Zakat() {
     businessInventory: 0,
     livestock: 0,
     crops: 0,
+    crypto: 0,
+    retirementAccounts: 0,
+    personalJewelry: 0,
     debtsOwed: 0,
+    livingExpenses: 0,
   });
   const [result, setResult] = useState<ZakatResult | null>(null);
+  const [includeJewelry, setIncludeJewelry] = useState(false);
+  const [includeRetirement, setIncludeRetirement] = useState(false);
 
   // --- Tatheer State ---
   const [ticker, setTicker] = useState("");
@@ -284,8 +290,18 @@ export default function Zakat() {
 
   const showNisabToggle = ["Shafi'i", "Maliki", "Hanbali"].includes(madhab);
 
+  // Reset madhab-specific toggles when madhab changes
+  useEffect(() => {
+    setIncludeJewelry(false);
+    setIncludeRetirement(false);
+    setAssets((prev) => ({ ...prev, personalJewelry: 0, retirementAccounts: 0, livingExpenses: 0 }));
+  }, [madhab]);
+
   const handleCalculate = () => {
-    const res = calculateZakat(assets, madhab, prices, nisabStandard);
+    const res = calculateZakat(assets, madhab, prices, nisabStandard, {
+      includeJewelry,
+      includeRetirement,
+    });
     setResult(res);
     setStep(3);
   };
@@ -425,7 +441,13 @@ export default function Zakat() {
         return result?.zakatDue ?? 0;
       case "tatheer":
         if (tatheerData?.isNotHalal) {
-          return tatheerData?.totalAnnualDividends ?? 0;
+          const baseDonation = tatheerData?.totalAnnualDividends ?? 0;
+          const cb = parseFloat(costBasisInput);
+          if (cb > 0 && tatheerData?.currentPrice) {
+            const unrealizedGains = (tatheerData.currentPrice - cb) * (tatheerData.shares ?? 0);
+            return baseDonation + Math.max(unrealizedGains, 0);
+          }
+          return baseDonation;
         }
         return tatheerData?.annualPurification ?? 0;
       case "khums":
@@ -594,25 +616,46 @@ export default function Zakat() {
                       </div>
                     )}
 
+                    {madhab === "Shafi'i" && (
+                      <div className="flex gap-3 rounded-2xl border border-accent/20 bg-accent/5 p-5">
+                        <Info className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
+                        <p className="text-sm text-foreground">
+                          Under the Shafi'i school, debts are <strong>not deducted</strong> from
+                          zakatable assets. Zakat is calculated on gross assets.
+                        </p>
+                      </div>
+                    )}
+
                     {(madhab === "Ja'fari"
-                      ? [
+                      ? ([
                           { key: "gold" as const, label: "Gold", unit: "grams" },
                           { key: "silver" as const, label: "Silver", unit: "grams" },
                           { key: "livestock" as const, label: "Livestock", unit: "USD" },
                           { key: "crops" as const, label: "Agricultural Produce / Crops", unit: "USD" },
                           { key: "debtsOwed" as const, label: "Debts Owed (Deductions)", unit: "USD" },
-                        ]
-                      : [
+                        ] as { key: keyof ZakatAssets; label: string; unit: string; hint?: string }[])
+                      : ([
                           { key: "cash" as const, label: "Cash & Bank Accounts", unit: "USD" },
                           { key: "gold" as const, label: "Gold", unit: "grams" },
                           { key: "silver" as const, label: "Silver", unit: "grams" },
-                          { key: "investments" as const, label: "Investments", unit: "USD" },
+                          { key: "investments" as const, label: "Investments", unit: "USD", hint: "1/3 of this amount is zakatable (tangible fixed assets are exempt)" },
                           { key: "businessInventory" as const, label: "Business Inventory", unit: "USD" },
-                          { key: "debtsOwed" as const, label: "Debts Owed (Deductions)", unit: "USD" },
-                        ]
+                          { key: "crypto" as const, label: "Crypto Assets", unit: "USD" },
+                          { key: "livestock" as const, label: "Livestock", unit: "USD" },
+                          { key: "crops" as const, label: "Agricultural Produce / Crops", unit: "USD" },
+                          ...(madhab !== "Shafi'i" ? [
+                            { key: "debtsOwed" as const, label: "Debts Owed (Deductions)", unit: "USD" },
+                          ] : []),
+                          ...(madhab === "Hanafi" ? [
+                            { key: "livingExpenses" as const, label: "Annual Living Expenses (Deduction)", unit: "USD", hint: "Hanafi school allows deducting basic living expenses" },
+                          ] : []),
+                        ] as { key: keyof ZakatAssets; label: string; unit: string; hint?: string }[])
                     ).map((field) => (
                       <div key={field.key}>
                         <Label className="font-ui text-sm font-medium">{field.label}</Label>
+                        {field.hint && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{field.hint}</p>
+                        )}
                         <div className="relative mt-1.5">
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                             {field.unit}
@@ -628,6 +671,117 @@ export default function Zakat() {
                         </div>
                       </div>
                     ))}
+
+                    {/* Personal Jewelry — madhab-dependent */}
+                    {madhab === "Hanafi" && (
+                      <div>
+                        <Label className="font-ui text-sm font-medium">Personal Jewelry</Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Under the Hanafi school, personal-use jewelry is always subject to zakat
+                        </p>
+                        <div className="relative mt-1.5">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                            USD
+                          </span>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={assets.personalJewelry || ""}
+                            onChange={(e) => updateAsset("personalJewelry", e.target.value)}
+                            className="bg-card pl-14"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {["Shafi'i", "Maliki", "Hanbali"].includes(madhab) && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between rounded-2xl border border-border/50 bg-muted/30 p-5">
+                          <div>
+                            <p className="font-ui text-sm font-medium text-foreground">
+                              Include Personal Jewelry?
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Most scholars in this school exempt personal-use jewelry from zakat
+                            </p>
+                          </div>
+                          <Switch
+                            checked={includeJewelry}
+                            onCheckedChange={setIncludeJewelry}
+                          />
+                        </div>
+                        {includeJewelry && (
+                          <div>
+                            <Label className="font-ui text-sm font-medium">Personal Jewelry Value</Label>
+                            <div className="relative mt-1.5">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                USD
+                              </span>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={assets.personalJewelry || ""}
+                                onChange={(e) => updateAsset("personalJewelry", e.target.value)}
+                                className="bg-card pl-14"
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Retirement Accounts — Shafi'i/Hanbali opt-in only */}
+                    {(madhab === "Shafi'i" || madhab === "Hanbali") && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between rounded-2xl border border-border/50 bg-muted/30 p-5">
+                          <div>
+                            <p className="font-ui text-sm font-medium text-foreground">
+                              Include Retirement Accounts?
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Most scholars consider retirement funds exempt until withdrawal
+                            </p>
+                          </div>
+                          <Switch
+                            checked={includeRetirement}
+                            onCheckedChange={setIncludeRetirement}
+                          />
+                        </div>
+                        {includeRetirement && (
+                          <>
+                            <div>
+                              <Label className="font-ui text-sm font-medium">Retirement Account Balance</Label>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Enter total balance. 1/3 will be used for zakat calculation.
+                              </p>
+                              <div className="relative mt-1.5">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                  USD
+                                </span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  value={assets.retirementAccounts || ""}
+                                  onChange={(e) => updateAsset("retirementAccounts", e.target.value)}
+                                  className="bg-card pl-14"
+                                  placeholder="0"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-3 rounded-2xl border border-accent/20 bg-accent/5 p-4">
+                              <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                              <p className="text-xs text-foreground">
+                                If you would owe taxes or early-withdrawal penalties on this
+                                balance, consider entering the net amount after deducting those
+                                costs.
+                              </p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
 
                     {!pricesLoading && (
                       <div className="rounded-2xl bg-muted/30 p-4 text-xs text-muted-foreground">
@@ -702,7 +856,7 @@ export default function Zakat() {
                       </div>
                     </div>
 
-                    {!result.isAboveNisab && !result.isJafari && (
+                    {!result.isAboveNisab && (
                       <div className="rounded-2xl border border-accent/20 bg-accent/5 p-5 text-center text-sm text-foreground">
                         Your net assets are below the Nisab threshold. No Zakat is due at
                         this time.
