@@ -129,6 +129,8 @@ export default function Zakat() {
     silver: 0,
     investments: 0,
     businessInventory: 0,
+    livestock: 0,
+    crops: 0,
     debtsOwed: 0,
   });
   const [result, setResult] = useState<ZakatResult | null>(null);
@@ -422,22 +424,34 @@ export default function Zakat() {
                     <CardTitle className="font-heading">Enter Your Assets</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-5">
-                    {[
-                      { key: "cash" as const, label: "Cash & Bank Accounts", unit: "USD" },
-                      { key: "gold" as const, label: "Gold", unit: "grams" },
-                      { key: "silver" as const, label: "Silver", unit: "grams" },
-                      { key: "investments" as const, label: "Investments", unit: "USD" },
-                      {
-                        key: "businessInventory" as const,
-                        label: "Business Inventory",
-                        unit: "USD",
-                      },
-                      {
-                        key: "debtsOwed" as const,
-                        label: "Debts Owed (Deductions)",
-                        unit: "USD",
-                      },
-                    ].map((field) => (
+                    {madhab === "Ja'fari" && (
+                      <div className="flex gap-3 rounded-2xl border border-accent/20 bg-accent/5 p-5">
+                        <Info className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
+                        <p className="text-sm text-foreground">
+                          Under Ja'fari fiqh, Zakat applies to gold, silver, livestock, and
+                          crops. For cash and investment obligations, use the{" "}
+                          <strong>Khums</strong> tab.
+                        </p>
+                      </div>
+                    )}
+
+                    {(madhab === "Ja'fari"
+                      ? [
+                          { key: "gold" as const, label: "Gold", unit: "grams" },
+                          { key: "silver" as const, label: "Silver", unit: "grams" },
+                          { key: "livestock" as const, label: "Livestock", unit: "USD" },
+                          { key: "crops" as const, label: "Agricultural Produce / Crops", unit: "USD" },
+                          { key: "debtsOwed" as const, label: "Debts Owed (Deductions)", unit: "USD" },
+                        ]
+                      : [
+                          { key: "cash" as const, label: "Cash & Bank Accounts", unit: "USD" },
+                          { key: "gold" as const, label: "Gold", unit: "grams" },
+                          { key: "silver" as const, label: "Silver", unit: "grams" },
+                          { key: "investments" as const, label: "Investments", unit: "USD" },
+                          { key: "businessInventory" as const, label: "Business Inventory", unit: "USD" },
+                          { key: "debtsOwed" as const, label: "Debts Owed (Deductions)", unit: "USD" },
+                        ]
+                    ).map((field) => (
                       <div key={field.key}>
                         <Label className="font-ui text-sm font-medium">{field.label}</Label>
                         <div className="relative mt-1.5">
@@ -521,7 +535,7 @@ export default function Zakat() {
                       </div>
                       <div className="rounded-2xl bg-primary p-5 text-center text-primary-foreground">
                         <p className="font-ui text-xs font-medium opacity-80">
-                          {result.isJafari ? "Total Due" : "Zakat Due (2.5%)"}
+                          Zakat Due (2.5%)
                         </p>
                         <p className="mt-1.5 font-heading text-lg font-bold">
                           {fmt(result.zakatDue)}
@@ -540,10 +554,9 @@ export default function Zakat() {
                       <div className="flex gap-3 rounded-2xl border border-accent/20 bg-accent/5 p-5">
                         <Info className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
                         <div className="text-sm text-foreground">
-                          <strong>Ja'fari Calculation:</strong> Cash, investments, and
-                          business inventory are subject to{" "}
-                          <strong>Khums (20%)</strong>. Only gold and silver are subject to
-                          standard Zakat (2.5%).
+                          <strong>Ja'fari Calculation:</strong> Zakat (2.5%) applies to
+                          gold, silver, livestock, and agricultural produce. For cash and
+                          investment obligations, use the <strong>Khums</strong> tab.
                         </div>
                       </div>
                     )}
