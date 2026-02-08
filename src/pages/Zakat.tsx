@@ -10,6 +10,8 @@ import {
   Search,
   ExternalLink,
 } from "lucide-react";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -140,9 +142,16 @@ export default function Zakat() {
   const [shares, setShares] = useState<number>(0);
   const [tatheerLoading, setTatheerLoading] = useState(false);
   const [tatheerData, setTatheerData] = useState<{
-    dividendPerShare: number | null;
+    hasDividend?: boolean;
     companyName: string;
-    impureRatio?: number;
+    annualDividend?: number;
+    quarterlyDividend?: number;
+    totalAnnualDividends?: number;
+    totalQuarterlyDividends?: number;
+    nonCompliantRatio?: number;
+    annualPurification?: number;
+    quarterlyPurification?: number;
+    shares?: number;
   } | null>(null);
   const [tatheerError, setTatheerError] = useState<string | null>(null);
 
@@ -158,20 +167,11 @@ export default function Zakat() {
   useEffect(() => {
     async function fetchPrices() {
       try {
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/metal-prices`,
-          {
-            headers: {
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        if (resp.ok) {
-          const data = await resp.json();
-          if (data.goldPerGram && data.silverPerGram) {
-            setPrices({ goldPerGram: data.goldPerGram, silverPerGram: data.silverPerGram });
-          }
+        const callMetalPrices = httpsCallable(functions, "metal-prices");
+        const result = await callMetalPrices({});
+        const data = result.data as any;
+        if (data.goldPerGram && data.silverPerGram) {
+          setPrices({ goldPerGram: data.goldPerGram, silverPerGram: data.silverPerGram });
         }
       } catch {
         // Use fallback
@@ -202,37 +202,27 @@ export default function Zakat() {
     setTatheerData(null);
 
     try {
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/getTatheerData`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ ticker: ticker.trim().toUpperCase() }),
-        }
-      );
-      const raw = await resp.json();
-      // Log raw response for debugging
+      const callGetTatheerData = httpsCallable(functions, "getTatheerData");
+      const result = await callGetTatheerData({ symbol: ticker.trim().toUpperCase(), shares: shares });
+      const raw = result.data as any;
       console.log("getTatheerData raw response:", raw);
 
-      // Handle nested response structures: result.data.dividendPerShare or result.dividendPerShare
-      const data = raw.data || raw;
-      const rawDividend = data.dividendPerShare ?? data.dividend_per_share ?? null;
-      const parsedDividend =
-        typeof rawDividend === "number" ? rawDividend : parseFloat(rawDividend);
-
-      // If dividendPerShare is NaN, undefined, or 0, treat as unavailable
-      const isValidDividend =
-        parsedDividend != null && !isNaN(parsedDividend) && parsedDividend !== 0;
-
-      setTatheerData({
-        dividendPerShare: isValidDividend ? parsedDividend : null,
-        companyName:
-          data.companyName || data.company_name || ticker.trim().toUpperCase(),
-        impureRatio: data.impureRatio ?? data.impure_ratio ?? data.purificationRatio,
-      });
+      if (raw.hasDividend === false) {
+        setTatheerData({ hasDividend: false, companyName: raw.companyName || ticker.toUpperCase() });
+      } else {
+        setTatheerData({
+          hasDividend: true,
+          companyName: raw.companyName || ticker.toUpperCase(),
+          annualDividend: Number(raw.annualDividend) || 0,
+          quarterlyDividend: Number(raw.quarterlyDividend) || 0,
+          totalAnnualDividends: Number(raw.totalAnnualDividends) || 0,
+          totalQuarterlyDividends: Number(raw.totalQuarterlyDividends) || 0,
+          nonCompliantRatio: Number(raw.nonCompliantRatio) || 0,
+          annualPurification: Number(raw.annualPurification) || 0,
+          quarterlyPurification: Number(raw.quarterlyPurification) || 0,
+          shares: Number(raw.shares) || 0,
+        });
+      }
     } catch (err) {
       console.error("getTatheerData error:", err);
       setTatheerError("Failed to fetch Tatheer data. Please try again.");
@@ -264,11 +254,8 @@ export default function Zakat() {
     switch (activeTab) {
       case "zakat":
         return result?.zakatDue ?? 0;
-      case "tatheer": {
-        if (!tatheerData?.dividendPerShare) return 0;
-        const ratio = tatheerData.impureRatio ?? 1;
-        return shares * tatheerData.dividendPerShare * ratio;
-      }
+      case "tatheer":
+        return tatheerData?.annualPurification ?? 0;
       case "khums":
         return khumsAmount;
       case "sadaqah":
@@ -675,47 +662,76 @@ export default function Zakat() {
                     Results for {tatheerData.companyName}
                   </h3>
 
-                  {tatheerData.dividendPerShare === null ? (
+                  {tatheerData.hasDividend === false ? (
                     <div className="rounded-2xl border border-amber-500/20 bg-amber-50 p-5 text-center text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
                       <Info className="mx-auto mb-2 h-5 w-5" />
-                      Dividend data unavailable for this stock. The company may not pay
-                      dividends, or data could not be retrieved.
+                      This stock doesn't pay dividends. No purification is needed.
                     </div>
                   ) : (
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div className="rounded-2xl bg-muted/40 p-5 text-center">
-                        <p className="font-ui text-xs font-medium text-muted-foreground">
-                          Dividend / Share
-                        </p>
-                        <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
-                          {fmt(tatheerData.dividendPerShare)}
-                        </p>
+                    <div className="space-y-4">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {/* Quarterly Column */}
+                        <div className="space-y-3">
+                          <h4 className="font-heading text-xs font-semibold text-muted-foreground text-center">Quarterly</h4>
+                          <div className="rounded-2xl bg-muted/40 p-5 text-center">
+                            <p className="font-ui text-xs font-medium text-muted-foreground">
+                              Dividend / Share
+                            </p>
+                            <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
+                              ${(tatheerData.quarterlyDividend ?? 0).toFixed(4)}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl bg-muted/40 p-5 text-center">
+                            <p className="font-ui text-xs font-medium text-muted-foreground">
+                              Total Dividends
+                            </p>
+                            <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
+                              {fmt(tatheerData.totalQuarterlyDividends ?? 0)}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: "#C9A96220" }}>
+                            <p className="font-ui text-xs font-medium" style={{ color: "#C9A962" }}>
+                              Purification
+                            </p>
+                            <p className="mt-1.5 font-heading text-lg font-bold" style={{ color: "#C9A962" }}>
+                              {fmt(tatheerData.quarterlyPurification ?? 0)}
+                            </p>
+                          </div>
+                        </div>
+                        {/* Annual Column */}
+                        <div className="space-y-3">
+                          <h4 className="font-heading text-xs font-semibold text-muted-foreground text-center">Annual</h4>
+                          <div className="rounded-2xl bg-muted/40 p-5 text-center">
+                            <p className="font-ui text-xs font-medium text-muted-foreground">
+                              Dividend / Share
+                            </p>
+                            <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
+                              ${(tatheerData.annualDividend ?? 0).toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl bg-muted/40 p-5 text-center">
+                            <p className="font-ui text-xs font-medium text-muted-foreground">
+                              Total Dividends
+                            </p>
+                            <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
+                              {fmt(tatheerData.totalAnnualDividends ?? 0)}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: "#C9A96220" }}>
+                            <p className="font-ui text-xs font-medium" style={{ color: "#C9A962" }}>
+                              Purification
+                            </p>
+                            <p className="mt-1.5 font-heading text-lg font-bold" style={{ color: "#C9A962" }}>
+                              {fmt(tatheerData.annualPurification ?? 0)}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="rounded-2xl bg-muted/40 p-5 text-center">
-                        <p className="font-ui text-xs font-medium text-muted-foreground">
-                          Total Dividends
+                      {tatheerData.nonCompliantRatio != null && (
+                        <p className="text-center text-xs text-muted-foreground">
+                          Non-compliant ratio: {(tatheerData.nonCompliantRatio * 100).toFixed(2)}% — Based on latest annual income statement
                         </p>
-                        <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
-                          {fmt(shares * tatheerData.dividendPerShare)}
-                        </p>
-                      </div>
-                      <div className="rounded-2xl bg-primary p-5 text-center text-primary-foreground">
-                        <p className="font-ui text-xs font-medium opacity-80">
-                          Purification Amount
-                        </p>
-                        <p className="mt-1.5 font-heading text-lg font-bold">
-                          {fmt(
-                            shares *
-                              tatheerData.dividendPerShare *
-                              (tatheerData.impureRatio ?? 1)
-                          )}
-                        </p>
-                        {tatheerData.impureRatio != null && (
-                          <p className="text-[10px] opacity-70">
-                            {(tatheerData.impureRatio * 100).toFixed(1)}% impure ratio
-                          </p>
-                        )}
-                      </div>
+                      )}
                     </div>
                   )}
                 </motion.div>
