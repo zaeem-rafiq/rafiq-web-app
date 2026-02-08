@@ -221,13 +221,6 @@ export default function Screener() {
       return;
     }
 
-    // Try first suggestion
-    if (suggestions.length > 0) {
-      selectStock(suggestions[0]);
-      setNotFound(false);
-      return;
-    }
-
     // Not found locally — trigger live AAOIFI screening
     setSelected(null);
     setSuggestions([]);
