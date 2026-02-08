@@ -186,45 +186,13 @@ export default function Screener() {
     }
   };
 
-  const selectStock = (stock: HalalStock | ShariahIndexEntry) => {
-    setSelected(stock);
-    setQuery(stock.symbol);
-    setSuggestions([]);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim() || liveScreening) return;
-
-    // Reset live screening state
-    setLiveResult(null);
-    setLiveRawResponse(null);
-    setLiveError(null);
-
-    const ticker = query.trim().toUpperCase();
-
-    // Try local detailed stocks
-    const found = findStock(ticker);
-    if (found) {
-      setSelected(found);
-      setSuggestions([]);
-      setNotFound(false);
-      return;
-    }
-
-    // Try shariah index
-    const indexEntry = findInIndex(ticker, shariahIndex);
-    if (indexEntry) {
-      setSelected(indexEntry);
-      setSuggestions([]);
-      setNotFound(false);
-      return;
-    }
-
-    // Not found locally — trigger live AAOIFI screening
+  const triggerLiveScreening = async (ticker: string) => {
     setSelected(null);
     setSuggestions([]);
     setNotFound(true);
+    setLiveResult(null);
+    setLiveRawResponse(null);
+    setLiveError(null);
     setLiveScreening(true);
 
     try {
@@ -244,6 +212,40 @@ export default function Screener() {
     } finally {
       setLiveScreening(false);
     }
+  };
+
+  const selectStock = (stock: HalalStock | ShariahIndexEntry) => {
+    setQuery(stock.symbol);
+    setSuggestions([]);
+    if (isHalalStock(stock)) {
+      setSelected(stock);
+    } else {
+      // Index entry — trigger live screening for full AAOIFI ratios
+      triggerLiveScreening(stock.symbol);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim() || liveScreening) return;
+
+    const ticker = query.trim().toUpperCase();
+
+    // Try local detailed stocks (have pre-computed ratios)
+    const found = findStock(ticker);
+    if (found) {
+      setSelected(found);
+      setSuggestions([]);
+      setNotFound(false);
+      setLiveResult(null);
+      setLiveRawResponse(null);
+      setLiveError(null);
+      return;
+    }
+
+    // Everything else — trigger live AAOIFI screening
+    setQuery(ticker);
+    triggerLiveScreening(ticker);
   };
 
   const selectedIsDetailed = selected && isHalalStock(selected);
