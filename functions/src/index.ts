@@ -1,0 +1,1 @@
+export { getTatheerData } from "./getTatheerData";
