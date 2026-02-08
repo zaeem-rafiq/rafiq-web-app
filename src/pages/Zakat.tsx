@@ -223,8 +223,26 @@ export default function Zakat() {
       setTickerInput(value);
       const upper = value.trim().toUpperCase();
       if (/^[A-Z]{1,5}$/.test(upper)) {
-        setTicker(upper);
-        setShowDropdown(false);
+        // Check if it's a known DJIM ticker symbol
+        const isKnownTicker = djimStocks.some(s => s.symbol === upper);
+        // Also check if the input matches any company name
+        const q = value.trim().toLowerCase();
+        const nameMatches = djimStocks.filter(s =>
+          s.name.toLowerCase().includes(q) || s.symbol.toLowerCase().includes(q)
+        );
+        if (isKnownTicker && nameMatches.length <= 1) {
+          // Unambiguous known ticker (e.g., "AAPL") — lock it in
+          setTicker(upper);
+          setShowDropdown(false);
+        } else if (nameMatches.length > 0) {
+          // Could be a company name like "Apple" that also passes regex — show dropdown
+          setTicker("");
+          setShowDropdown(true);
+        } else {
+          // Unknown short alpha string — assume it's a ticker attempt (e.g., "XYZ")
+          setTicker(upper);
+          setShowDropdown(false);
+        }
       } else {
         setTicker("");
         setShowDropdown(value.trim().length > 0);
@@ -277,6 +295,7 @@ export default function Zakat() {
       return; // Nothing to look up
     }
 
+    console.log("djimStocks length:", djimStocks.length, "resolvedTicker:", resolvedTicker);
     setTatheerLoading(true);
     setTatheerError(null);
     setTatheerData(null);
