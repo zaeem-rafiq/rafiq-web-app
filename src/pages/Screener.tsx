@@ -173,6 +173,7 @@ export default function Screener() {
 
   const handleSearch = (val: string) => {
     setQuery(val);
+    setSelected(null);
     setNotFound(false);
     setLiveResult(null);
     setLiveRawResponse(null);
@@ -596,6 +597,25 @@ export default function Screener() {
             </div>
             <p className="font-heading text-lg font-semibold text-foreground">Screening Failed</p>
             <p className="max-w-sm text-sm text-muted-foreground">{liveError}</p>
+          </motion.div>
+        ) : query.trim().length >= 1 ? (
+          <motion.div
+            key="press-enter"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.3 }}
+            className="flex flex-col items-center gap-4 py-20 text-center"
+          >
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+              <Search className="h-8 w-8 text-primary" />
+            </div>
+            <p className="font-heading text-lg font-semibold text-foreground">
+              Press Enter to screen <span className="text-primary">"{query.trim().toUpperCase()}"</span>
+            </p>
+            <p className="max-w-sm text-sm text-muted-foreground">
+              We'll perform a live AAOIFI Shariah compliance screening using AI.
+            </p>
           </motion.div>
         ) : (
           <motion.div
