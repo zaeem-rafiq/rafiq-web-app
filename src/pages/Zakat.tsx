@@ -24,6 +24,8 @@ import {
   type ZakatResult,
   calculateZakat,
 } from "@/lib/zakat-utils";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
 
 const madhabs: Madhab[] = ["Hanafi", "Shafi'i", "Maliki", "Hanbali", "Ja'fari"];
 
@@ -209,23 +211,11 @@ export default function Zakat() {
     setTatheerData(null);
 
     try {
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/getTatheerData`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ ticker: ticker.trim().toUpperCase(), shares }),
-        }
-      );
-      const raw = await resp.json();
+      const callGetTatheerData = httpsCallable(functions, "getTatheerData");
+      const result = await callGetTatheerData({ symbol: ticker.trim().toUpperCase(), shares });
+      const data = result.data as Record<string, unknown>;
       // Log raw response for debugging
-      console.log("getTatheerData raw response:", raw);
-
-      // Handle nested response structures
-      const data = raw.data || raw;
+      console.log("getTatheerData raw response:", data);
 
       const safeNum = (v: unknown) => {
         const n = typeof v === "number" ? v : parseFloat(v as string);
