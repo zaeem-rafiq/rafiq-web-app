@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import rafiqLogo from "@/assets/rafiq-logo.png";
+import { findStock } from "@/data/halal-stocks";
 
 interface Msg {
   role: "user" | "assistant";
@@ -19,6 +20,33 @@ const suggestedQuestions = [
 ];
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+const SCREEN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/screen-stock`;
+
+// Common English words to exclude from ticker detection
+const STOP_WORDS = new Set([
+  "is", "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+  "of", "with", "by", "from", "as", "into", "about", "how", "what", "which",
+  "who", "when", "where", "why", "can", "could", "would", "should", "will",
+  "do", "does", "did", "has", "have", "had", "not", "are", "was", "were",
+  "been", "be", "its", "it", "my", "your", "this", "that", "any", "all",
+  "more", "most", "some", "such", "than", "too", "very", "just", "also",
+  "halal", "haram", "stock", "stocks", "invest", "check", "tell", "me",
+  "yes", "no", "ok", "hey", "hi", "hello", "thanks", "thank", "please",
+  "i", "if", "so", "up", "out", "get", "got", "like", "know", "think",
+  "etf", "etfs", "fund", "funds", "buy", "sell", "good", "bad",
+]);
+
+function extractTickers(text: string): string[] {
+  const words = text.match(/\b[A-Za-z]{1,5}\b/g) || [];
+  const tickers: string[] = [];
+  for (const w of words) {
+    const upper = w.toUpperCase();
+    if (!STOP_WORDS.has(w.toLowerCase()) && /^[A-Z]{1,5}$/.test(upper)) {
+      if (!tickers.includes(upper)) tickers.push(upper);
+    }
+  }
+  return tickers;
+}
 
 function TypingIndicator() {
   return (
@@ -68,13 +96,54 @@ export default function AskRafiq() {
     };
 
     try {
+      // Extract tickers from user message (case-insensitive)
+      const tickers = extractTickers(text);
+      console.log("Extracted tickers:", tickers);
+
+      let screeningContext = "";
+      for (const ticker of tickers) {
+        const local = findStock(ticker);
+        if (local) {
+          console.log(`Found ${ticker} in local data:`, local);
+          screeningContext += `\n[Screening data for ${ticker} (${local.name}): Status=${local.status}, Debt Ratio=${local.ratios.debtRatio}%, Interest Income=${local.ratios.interestIncome}%, Cash & Securities=${local.ratios.cashSecurities}%, Business Activity=${local.ratios.businessActivity}]`;
+        } else {
+          // Try live screening via screen-stock edge function
+          try {
+            const screenResp = await fetch(SCREEN_URL, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+              },
+              body: JSON.stringify({ symbol: ticker }),
+            });
+            if (screenResp.ok) {
+              const result = await screenResp.json();
+              console.log(`Live screening for ${ticker}:`, result);
+              screeningContext += `\n[Live screening data for ${ticker} (${result.name}): Status=${result.status}, Debt Ratio=${result.ratios?.debtRatio}%, Interest Income=${result.ratios?.interestIncome}%, Cash & Securities=${result.ratios?.cashSecurities}%, Business Activity=${result.ratios?.businessActivity}]`;
+            }
+          } catch (err) {
+            console.error(`Live screening failed for ${ticker}:`, err);
+          }
+        }
+      }
+
+      // Build messages for the API, injecting screening context if available
+      const messagesForApi = [...messages, userMsg];
+      if (screeningContext) {
+        messagesForApi.push({
+          role: "user" as const,
+          content: `[System context - screening data for user's question]:${screeningContext}`,
+        });
+      }
+
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: [...messages, userMsg] }),
+        body: JSON.stringify({ messages: messagesForApi }),
       });
 
       if (resp.status === 429) {

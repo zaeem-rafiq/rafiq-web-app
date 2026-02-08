@@ -52,6 +52,7 @@ export const halalStocks: HalalStock[] = [
   { symbol: "ZM", name: "Zoom Video Comm.", sector: "Technology", status: "HALAL", ratios: { debtRatio: 1.2, interestIncome: 3.1, cashSecurities: 31.2, businessActivity: "PASS" } },
   { symbol: "SPOT", name: "Spotify Technology", sector: "Communication Services", status: "HALAL", ratios: { debtRatio: 7.8, interestIncome: 1.4, cashSecurities: 22.5, businessActivity: "PASS" } },
   { symbol: "MRNA", name: "Moderna Inc.", sector: "Healthcare", status: "HALAL", ratios: { debtRatio: 5.1, interestIncome: 2.5, cashSecurities: 30.8, businessActivity: "PASS" } },
+  { symbol: "WMT", name: "Walmart Inc.", sector: "Consumer Defensive", status: "HALAL", ratios: { debtRatio: 18.2, interestIncome: 0.4, cashSecurities: 5.8, businessActivity: "PASS" } },
 ];
 
 export function searchStocks(query: string): HalalStock[] {

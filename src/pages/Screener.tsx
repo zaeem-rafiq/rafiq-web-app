@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, CheckCircle2, XCircle, AlertTriangle, TrendingUp } from "lucide-react";
+import { Search, CheckCircle2, XCircle, AlertTriangle, TrendingUp, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,10 +51,13 @@ function RatioCard({
   );
 }
 
+const SCREEN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/screen-stock`;
+
 export default function Screener() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<HalalStock | null>(null);
   const [suggestions, setSuggestions] = useState<HalalStock[]>([]);
+  const [isScreening, setIsScreening] = useState(false);
 
   const handleSearch = (val: string) => {
     setQuery(val);
@@ -71,7 +74,7 @@ export default function Screener() {
     setSuggestions([]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const found = findStock(query);
     if (found) {
@@ -79,6 +82,30 @@ export default function Screener() {
       setSuggestions([]);
     } else if (suggestions.length > 0) {
       selectStock(suggestions[0]);
+    } else if (query.trim()) {
+      // Live screening fallback for tickers not in local data
+      setIsScreening(true);
+      setSelected(null);
+      try {
+        const resp = await fetch(SCREEN_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ symbol: query.trim() }),
+        });
+        if (resp.ok) {
+          const result = await resp.json();
+          console.log("Live screening result:", result);
+          setSelected(result as HalalStock);
+          setSuggestions([]);
+        }
+      } catch (err) {
+        console.error("Live screening failed:", err);
+      } finally {
+        setIsScreening(false);
+      }
     }
   };
 
@@ -138,7 +165,19 @@ export default function Screener() {
 
       {/* Results */}
       <AnimatePresence mode="wait">
-        {selected && cfg ? (
+        {isScreening ? (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center gap-4 py-20 text-center"
+          >
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="font-heading text-lg font-semibold text-muted-foreground">
+              Performing live AAOIFI screening...
+            </p>
+          </motion.div>
+        ) : selected && cfg ? (
           <motion.div
             key={selected.symbol}
             initial={{ opacity: 0, y: 16 }}
