@@ -3,7 +3,7 @@ import { defineSecret } from "firebase-functions/params";
 
 const fmpApiKey = defineSecret("FMP_API_KEY");
 
-const FMP_BASE = "https://financialmodelingprep.com/api/v3";
+const FMP_BASE = "https://financialmodelingprep.com/stable";
 
 interface FmpProfile {
   companyName?: string;
@@ -58,7 +58,7 @@ export const getTatheerData = onCall(
     let resolvedTicker = ticker;
     try {
       const searchResp = await fetch(
-        `${FMP_BASE}/search?query=${encodeURIComponent(ticker)}&limit=1&apikey=${apiKey}`
+        `${FMP_BASE}/search-name?query=${encodeURIComponent(ticker)}&limit=1&apikey=${apiKey}`
       );
       if (searchResp.ok) {
         const searchResults: FmpSearchResult[] = await searchResp.json();
@@ -73,11 +73,9 @@ export const getTatheerData = onCall(
 
     // Fetch all 3 endpoints in parallel using resolved ticker
     const [profileResp, dividendResp, incomeResp] = await Promise.all([
-      fetch(`${FMP_BASE}/profile/${resolvedTicker}?apikey=${apiKey}`),
-      fetch(
-        `${FMP_BASE}/historical-price-full/stock_dividend/${resolvedTicker}?apikey=${apiKey}`
-      ),
-      fetch(`${FMP_BASE}/income-statement/${resolvedTicker}?limit=1&apikey=${apiKey}`),
+      fetch(`${FMP_BASE}/profile?symbol=${resolvedTicker}&apikey=${apiKey}`),
+      fetch(`${FMP_BASE}/dividends?symbol=${resolvedTicker}&apikey=${apiKey}`),
+      fetch(`${FMP_BASE}/income-statement?symbol=${resolvedTicker}&limit=1&apikey=${apiKey}`),
     ]);
 
     // --- Profile ---
@@ -99,7 +97,8 @@ export const getTatheerData = onCall(
 
     if (dividendResp.ok) {
       const dividendData = await dividendResp.json();
-      const history: FmpDividendEntry[] = dividendData?.historical || [];
+      // /stable/dividends returns a flat array (no .historical wrapper)
+      const history: FmpDividendEntry[] = Array.isArray(dividendData) ? dividendData : (dividendData?.historical || []);
 
       if (history.length > 0) {
         hasDividend = true;
