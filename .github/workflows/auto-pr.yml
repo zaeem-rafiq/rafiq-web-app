@@ -1,0 +1,33 @@
+name: Auto PR for Claude branches
+on:
+  push:
+    branches: ['claude/**']
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create PR and enable auto-merge
+        run: |
+          # Create the PR
+          PR_URL=$(gh pr create \
+            --base main \
+            --head "${{ github.ref_name }}" \
+            --title "Merge ${{ github.ref_name }}" \
+            --body "Auto-created PR from Claude Code" \
+            2>&1) || true
+
+          # Get PR number
+          PR_NUM=$(gh pr view "${{ github.ref_name }}" --json number -q '.number')
+
+          # Enable auto-merge (squash)
+          if [ -n "$PR_NUM" ]; then
+            gh pr merge "$PR_NUM" --auto --squash
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
