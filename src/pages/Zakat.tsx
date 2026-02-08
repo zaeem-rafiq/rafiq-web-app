@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Calculator, ArrowRight, ArrowLeft, Info, DollarSign, ExternalLink, Heart, Sparkles } from "lucide-react";
+import { Calculator, ArrowRight, ArrowLeft, Info, DollarSign, ExternalLink, Heart, Sparkles, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -130,6 +130,11 @@ export default function Zakat() {
   const [tatheerRatio, setTatheerRatio] = useState(0);
   const [tatheerResult, setTatheerResult] = useState<number | null>(null);
 
+  // -- Khums state --
+  const [khumsIncome, setKhumsIncome] = useState(0);
+  const [khumsExpenses, setKhumsExpenses] = useState(0);
+  const [khumsResult, setKhumsResult] = useState<{ surplus: number; khums: number; imam: number; sadat: number } | null>(null);
+
   // -- Sadaqah state --
   const [sadaqahAmount, setSadaqahAmount] = useState<number | null>(null);
   const [sadaqahCustom, setSadaqahCustom] = useState("");
@@ -182,6 +187,16 @@ export default function Zakat() {
     setTatheerResult(tatheerDividends * (tatheerRatio / 100));
   };
 
+  const handleKhumsCalculate = () => {
+    const surplus = khumsIncome - khumsExpenses;
+    if (surplus > 0) {
+      const khums = surplus * 0.2;
+      setKhumsResult({ surplus, khums, imam: khums / 2, sadat: khums / 2 });
+    } else {
+      setKhumsResult({ surplus, khums: 0, imam: 0, sadat: 0 });
+    }
+  };
+
   const sadaqahPresets = [25, 50, 100, 250];
 
   const handleSadaqahSelect = (amount: number) => {
@@ -210,12 +225,15 @@ export default function Zakat() {
       </div>
 
       <Tabs defaultValue="zakat" className="w-full">
-        <TabsList className="mb-8 grid w-full grid-cols-3">
+        <TabsList className="mb-8 grid w-full grid-cols-4">
           <TabsTrigger value="zakat" className="font-ui font-semibold">
             <Calculator size={14} className="mr-1.5" /> Zakat
           </TabsTrigger>
           <TabsTrigger value="tatheer" className="font-ui font-semibold">
             <Sparkles size={14} className="mr-1.5" /> Tatheer
+          </TabsTrigger>
+          <TabsTrigger value="khums" className="font-ui font-semibold">
+            <Scale size={14} className="mr-1.5" /> Khums
           </TabsTrigger>
           <TabsTrigger value="sadaqah" className="font-ui font-semibold">
             <Heart size={14} className="mr-1.5" /> Sadaqah
@@ -540,6 +558,137 @@ export default function Zakat() {
 
           {tatheerResult !== null && tatheerResult > 0 && (
             <CharitySection heading="Purify Your Dividends" />
+          )}
+        </TabsContent>
+
+        {/* ═══════════════ KHUMS TAB ═══════════════ */}
+        <TabsContent value="khums">
+          <Card className="border-border/50 bg-card shadow-sm">
+            <CardHeader>
+              <CardTitle className="font-heading">Khums Calculator</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="flex gap-3 rounded-2xl border border-accent/20 bg-accent/5 p-5">
+                <Info className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
+                <p className="text-sm text-foreground">
+                  Khums is an obligation in the Ja'fari (Shia) school of thought. It requires paying
+                  20% of annual surplus income — the amount remaining after all legitimate living expenses.
+                </p>
+              </div>
+
+              <div>
+                <Label className="font-ui text-sm font-medium">Total Annual Income</Label>
+                <div className="relative mt-1.5">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    USD
+                  </span>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={khumsIncome || ""}
+                    onChange={(e) => setKhumsIncome(parseFloat(e.target.value) || 0)}
+                    className="bg-card pl-14"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="font-ui text-sm font-medium">Total Annual Expenses</Label>
+                <p className="mb-1.5 text-xs text-muted-foreground">
+                  Include all legitimate living expenses: housing, food, transportation, education,
+                  healthcare, clothing, etc.
+                </p>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    USD
+                  </span>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={khumsExpenses || ""}
+                    onChange={(e) => setKhumsExpenses(parseFloat(e.target.value) || 0)}
+                    className="bg-card pl-14"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              {/* Formula */}
+              <div className="rounded-2xl bg-muted/30 p-4 text-center text-xs text-muted-foreground">
+                Surplus = Income − Expenses. If surplus &gt; 0, Khums = Surplus × 20%
+              </div>
+
+              <Button
+                onClick={handleKhumsCalculate}
+                className="w-full gap-2 font-ui font-semibold"
+                disabled={khumsIncome <= 0}
+              >
+                Calculate Khums <Scale size={16} />
+              </Button>
+
+              {khumsResult !== null && (
+                <div className="space-y-3">
+                  {/* Surplus summary */}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl bg-muted/40 p-5 text-center">
+                      <p className="font-ui text-xs font-medium text-muted-foreground">Annual Surplus</p>
+                      <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
+                        {fmt(Math.max(0, khumsResult.surplus))}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: "#C9A962" }}>
+                      <p className="font-ui text-xs font-medium" style={{ color: "#2C2C2C" }}>
+                        Khums Due (20%)
+                      </p>
+                      <p className="mt-1.5 font-heading text-lg font-bold" style={{ color: "#2C2C2C" }}>
+                        {fmt(khumsResult.khums)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {khumsResult.khums > 0 ? (
+                    <div className="space-y-2">
+                      <h3 className="font-heading text-sm font-semibold text-foreground">Breakdown</h3>
+                      <div className="flex items-center justify-between rounded-xl border border-border/40 px-5 py-3.5">
+                        <div>
+                          <p className="font-ui text-sm font-medium" style={{ color: "#1B4D3E" }}>
+                            Sahm al-Imam (50%)
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Traditionally given to a qualified Marja or their representative
+                          </p>
+                        </div>
+                        <span className="font-ui text-sm font-semibold" style={{ color: "#C9A962" }}>
+                          {fmt(khumsResult.imam)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl border border-border/40 px-5 py-3.5">
+                        <div>
+                          <p className="font-ui text-sm font-medium" style={{ color: "#1B4D3E" }}>
+                            Sahm al-Sadat (50%)
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Given to Sayyids (descendants of the Prophet ﷺ) in need
+                          </p>
+                        </div>
+                        <span className="font-ui text-sm font-semibold" style={{ color: "#C9A962" }}>
+                          {fmt(khumsResult.sadat)}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-accent/20 bg-accent/5 p-5 text-center text-sm text-foreground">
+                      Your expenses meet or exceed your income. No Khums is due at this time.
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {khumsResult !== null && khumsResult.khums > 0 && (
+            <CharitySection heading="Pay Your Khums" />
           )}
         </TabsContent>
 
