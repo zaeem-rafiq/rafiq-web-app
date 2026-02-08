@@ -10,8 +10,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { httpsCallable, functions } from "@/lib/firebase";
 import {
   searchExtended,
-  findStock,
-  findInIndex,
   loadShariahIndex,
   isHalalStock,
   type HalalStock,
@@ -158,7 +156,6 @@ function RatioCard({
 
 export default function Screener() {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<HalalStock | ShariahIndexEntry | null>(null);
   const [suggestions, setSuggestions] = useState<(HalalStock | ShariahIndexEntry)[]>([]);
   const [shariahIndex, setShariahIndex] = useState<ShariahIndexEntry[]>([]);
   const [notFound, setNotFound] = useState(false);
@@ -173,7 +170,6 @@ export default function Screener() {
 
   const handleSearch = (val: string) => {
     setQuery(val);
-    setSelected(null);
     setNotFound(false);
     setLiveResult(null);
     setLiveRawResponse(null);
@@ -187,7 +183,6 @@ export default function Screener() {
   };
 
   const triggerLiveScreening = async (ticker: string) => {
-    setSelected(null);
     setSuggestions([]);
     setNotFound(true);
     setLiveResult(null);
@@ -217,12 +212,7 @@ export default function Screener() {
   const selectStock = (stock: HalalStock | ShariahIndexEntry) => {
     setQuery(stock.symbol);
     setSuggestions([]);
-    if (isHalalStock(stock)) {
-      setSelected(stock);
-    } else {
-      // Index entry — trigger live screening for full AAOIFI ratios
-      triggerLiveScreening(stock.symbol);
-    }
+    triggerLiveScreening(stock.symbol);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -230,26 +220,9 @@ export default function Screener() {
     if (!query.trim() || liveScreening) return;
 
     const ticker = query.trim().toUpperCase();
-
-    // Try local detailed stocks (have pre-computed ratios)
-    const found = findStock(ticker);
-    if (found) {
-      setSelected(found);
-      setSuggestions([]);
-      setNotFound(false);
-      setLiveResult(null);
-      setLiveRawResponse(null);
-      setLiveError(null);
-      return;
-    }
-
-    // Everything else — trigger live AAOIFI screening
     setQuery(ticker);
     triggerLiveScreening(ticker);
   };
-
-  const selectedIsDetailed = selected && isHalalStock(selected);
-  const cfg = selectedIsDetailed ? statusConfig[selected.status] : selected ? statusConfig["HALAL"] : null;
 
   return (
     <main className="container mx-auto max-w-3xl px-4 py-10 sm:py-14">
@@ -277,7 +250,7 @@ export default function Screener() {
 
         {/* Dropdown suggestions */}
         <AnimatePresence>
-          {query.trim().length >= 1 && !selected && !notFound && (
+          {query.trim().length >= 1 && !notFound && (
             <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
@@ -323,107 +296,7 @@ export default function Screener() {
 
       {/* Results */}
       <AnimatePresence mode="wait">
-        {selected && cfg ? (
-          <motion.div
-            key={selected.symbol}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
-            transition={{ duration: 0.3 }}
-          >
-            {/* Stock info card */}
-            <Card className="mb-6 border-border/50 bg-card shadow-sm">
-              <CardContent className="flex flex-col items-start gap-4 p-7 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                    <TrendingUp className="h-7 w-7 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="font-heading text-xl font-bold text-foreground">{selected.symbol}</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedIsDetailed ? selected.name : selected.sector}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{selected.sector}</p>
-                  </div>
-                </div>
-                <Badge className={`px-4 py-1.5 font-ui text-sm font-bold ${cfg.color}`}>
-                  <cfg.icon className="mr-1.5 h-4 w-4" />
-                  {cfg.label}
-                </Badge>
-              </CardContent>
-            </Card>
-
-            {/* AAOIFI Ratios */}
-            {selectedIsDetailed ? (
-              <Card className="border-border/50 bg-card shadow-sm">
-                <CardHeader className="pb-4">
-                  <CardTitle className="font-heading text-lg">AAOIFI Screening Criteria</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <RatioCard
-                      label="Debt Ratio"
-                      value={selected.ratios.debtRatio}
-                      threshold={33}
-                      unit="<"
-                      pass={selected.ratios.debtRatio < 33}
-                    />
-                    <RatioCard
-                      label="Interest Income"
-                      value={selected.ratios.interestIncome}
-                      threshold={5}
-                      unit="<"
-                      pass={selected.ratios.interestIncome < 5}
-                    />
-                    <RatioCard
-                      label="Cash & Securities"
-                      value={selected.ratios.cashSecurities}
-                      threshold={33}
-                      unit="<"
-                      pass={selected.ratios.cashSecurities < 33}
-                    />
-                    <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="font-ui text-sm font-medium text-foreground">Business Activity</span>
-                        {selected.ratios.businessActivity === "PASS" ? (
-                          <CheckCircle2 className="h-5 w-5 text-halal" />
-                        ) : selected.ratios.businessActivity === "FAIL" ? (
-                          <XCircle className="h-5 w-5 text-haram" />
-                        ) : (
-                          <AlertTriangle className="h-5 w-5 text-questionable" />
-                        )}
-                      </div>
-                      <div className="font-heading text-2xl font-bold text-foreground">
-                        {selected.ratios.businessActivity}
-                      </div>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Core business must be Shariah-compliant
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="border-border/50 bg-card shadow-sm">
-                <CardContent className="p-7">
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-halal" />
-                    <div>
-                      <p className="font-ui text-sm font-medium text-foreground">
-                        Shariah Index Constituent
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        This stock is included in the Dow Jones Islamic Market / S&P Shariah Index
-                        and has passed Shariah screening criteria. Detailed AAOIFI ratio breakdowns
-                        are not yet available for this stock.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </motion.div>
-        ) : notFound && liveScreening ? (
+        {notFound && liveScreening ? (
           <motion.div
             key="live-screening-loading"
             initial={{ opacity: 0, y: 16 }}
