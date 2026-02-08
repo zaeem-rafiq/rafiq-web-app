@@ -205,22 +205,25 @@ export default function Zakat() {
       const callGetTatheerData = httpsCallable(functions, "getTatheerData");
       const result = await callGetTatheerData({ symbol: ticker.trim().toUpperCase(), shares: shares });
       const raw = result.data as any;
+      // httpsCallable may nest the actual payload under a `data` or `result` key
+      const data = raw?.data ?? raw?.result ?? raw;
       console.log("getTatheerData raw response:", raw);
+      console.log("getTatheerData unwrapped data:", data);
 
-      if (raw.hasDividend === false) {
-        setTatheerData({ hasDividend: false, companyName: raw.companyName || ticker.toUpperCase() });
+      if (data.hasDividend === false) {
+        setTatheerData({ hasDividend: false, companyName: data.companyName || ticker.toUpperCase() });
       } else {
         setTatheerData({
           hasDividend: true,
-          companyName: raw.companyName || ticker.toUpperCase(),
-          annualDividend: Number(raw.annualDividend) || 0,
-          quarterlyDividend: Number(raw.quarterlyDividend) || 0,
-          totalAnnualDividends: Number(raw.totalAnnualDividends) || 0,
-          totalQuarterlyDividends: Number(raw.totalQuarterlyDividends) || 0,
-          nonCompliantRatio: Number(raw.nonCompliantRatio) || 0,
-          annualPurification: Number(raw.annualPurification) || 0,
-          quarterlyPurification: Number(raw.quarterlyPurification) || 0,
-          shares: Number(raw.shares) || 0,
+          companyName: data.companyName || ticker.toUpperCase(),
+          annualDividend: Number(data.annualDividend) || 0,
+          quarterlyDividend: Number(data.quarterlyDividend) || 0,
+          totalAnnualDividends: Number(data.totalAnnualDividends) || 0,
+          totalQuarterlyDividends: Number(data.totalQuarterlyDividends) || 0,
+          nonCompliantRatio: Number(data.nonCompliantRatio) || 0,
+          annualPurification: Number(data.annualPurification) || 0,
+          quarterlyPurification: Number(data.quarterlyPurification) || 0,
+          shares: Number(data.shares) || 0,
         });
       }
     } catch (err) {
