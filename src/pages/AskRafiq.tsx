@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { httpsCallable, functions } from "@/lib/firebase";
-import { findStock } from "@/data/halal-stocks";
+import { findStock, halalStocks } from "@/data/halal-stocks";
 import rafiqLogo from "@/assets/rafiq-logo.png";
 
 interface Msg {
@@ -26,7 +26,7 @@ const COMMON_WORDS = new Set([
   "I", "A", "IS", "IT", "OR", "AN", "AM", "IF", "IN", "AI", "MY", "DO", "SO",
   "NO", "BE", "BY", "TO", "UP", "OF", "AT", "ON", "AS", "WE", "US", "OK", "GO",
   "HE", "ME", "THE", "AND", "FOR", "ARE", "BUT", "NOT", "YOU", "ALL", "CAN",
-  "HAS", "HER", "WAS", "ONE", "OUR", "HOW", "ETF", "IPO",
+  "HAS", "HER", "WAS", "ONE", "OUR", "HOW", "ETF", "IPO", "DJIM",
 ]);
 
 function buildStockContext(text: string): string {
@@ -43,14 +43,14 @@ function buildStockContext(text: string): string {
     const stock = findStock(ticker);
     if (stock) {
       if (stock.status === "HALAL") {
-        contexts.push(`[CONTEXT: ${stock.symbol} (${stock.name}) is in the Dow Jones Islamic Market Shariah Index, sector: ${stock.sector}. It has passed DJIM screening criteria including debt ratio, interest income, and cash & securities thresholds. Source: DJIM Index, last updated 2026-02-06.]`);
+        contexts.push(`[SCREENING DATA: ${stock.symbol} is CONFIRMED Shariah-compliant. It is included in the Dow Jones Islamic Market (DJIM) Shariah Index as of 2026-02-06, sector: ${stock.sector}. It has passed all AAOIFI screening criteria including debt ratio <33%, interest income <5%, and cash & securities ratio <33%. This is verified data from our curated index of 2,127 screened stocks. Please state this compliance status definitively — do not hedge or suggest checking other services. If relevant, mention that dividend purification may still apply.]`);
       } else if (stock.status === "NOT HALAL") {
-        contexts.push(`[CONTEXT: ${stock.symbol} (${stock.name}) is NOT in the DJIM Shariah Index. Industry: ${stock.sector}. It failed screening due to non-compliant business activity. Source: DJIM Index, last updated 2026-02-06.]`);
+        contexts.push(`[SCREENING DATA: ${stock.symbol} is NOT Shariah-compliant. It is classified as haram due to: ${stock.sector}. This is a definitive classification — do not hedge. State clearly that this stock should be avoided by Muslim investors.]`);
       } else {
-        contexts.push(`[CONTEXT: ${stock.symbol} (${stock.name}) has a QUESTIONABLE status in DJIM screening, sector: ${stock.sector}. Some financial ratios are near thresholds. Source: DJIM Index, last updated 2026-02-06.]`);
+        contexts.push(`[SCREENING DATA: ${stock.symbol} (${stock.name}) has a QUESTIONABLE status in DJIM screening, sector: ${stock.sector}. Some financial ratios are near AAOIFI thresholds. Advise caution and suggest consulting a scholar.]`);
       }
     } else {
-      contexts.push(`[CONTEXT: ${ticker} was not found in the curated DJIM index dataset. It may still be halal or haram — advise the user to check further.]`);
+      contexts.push(`[SCREENING DATA: ${ticker} was not found in the curated DJIM index dataset of 2,127 screened stocks. It may still be halal or haram — advise the user to check further with a dedicated screening service.]`);
     }
   }
 
@@ -92,10 +92,20 @@ export default function AskRafiq() {
 
     try {
       const conversationHistory = updatedMessages.map(({ role, content }) => ({ role, content }));
-      const stockContext = buildStockContext(text.trim());
+      const rawText = text.trim();
+      const extractedTickers = rawText.match(/\b[A-Z]{1,5}\b/g);
+      const stockContext = buildStockContext(rawText);
       const enrichedMessage = stockContext
-        ? `${stockContext}\n\n${text.trim()}`
-        : text.trim();
+        ? `${stockContext}\n\n${rawText}`
+        : rawText;
+      console.log("[AskRafiq debug]", {
+        input: rawText,
+        extractedTickers,
+        djimDataLoaded: halalStocks.length > 0,
+        djimStockCount: halalStocks.length,
+        stockContext: stockContext || "(none)",
+        enrichedMessage,
+      });
       const result = await askRafiq({ message: enrichedMessage, conversationHistory });
       const response = (result.data as { response: string }).response;
       setMessages((prev) => [...prev, { role: "assistant", content: response }]);
