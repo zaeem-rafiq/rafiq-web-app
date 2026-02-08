@@ -295,6 +295,9 @@ export default function Zakat() {
       return; // Nothing to look up
     }
 
+    // Use tickerInput for display fallback (user-friendly name)
+    const displayFallback = tickerInput.trim() || resolvedTicker;
+
     console.log("djimStocks length:", djimStocks.length, "resolvedTicker:", resolvedTicker);
     setTatheerLoading(true);
     setTatheerError(null);
@@ -310,11 +313,11 @@ export default function Zakat() {
       console.log("getTatheerData unwrapped data:", data);
 
       if (data.hasDividend === false) {
-        setTatheerData({ hasDividend: false, companyName: data.companyName || ticker.toUpperCase() });
+        setTatheerData({ hasDividend: false, companyName: data.companyName || displayFallback });
       } else {
         setTatheerData({
           hasDividend: true,
-          companyName: data.companyName || ticker.toUpperCase(),
+          companyName: data.companyName || displayFallback,
           annualDividend: Number(data.annualDividend) || 0,
           quarterlyDividend: Number(data.quarterlyDividend) || 0,
           totalAnnualDividends: Number(data.totalAnnualDividends) || 0,
