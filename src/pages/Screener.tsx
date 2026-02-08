@@ -274,40 +274,52 @@ export default function Screener() {
           <Input
             value={query}
             onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Search any stock ticker (e.g. AAPL, MSFT)"
+            placeholder="Search by ticker or company name (e.g. AAPL, Cummins)"
             className="h-12 rounded-2xl bg-card pl-12 text-base shadow-sm"
           />
         </div>
 
         {/* Dropdown suggestions */}
         <AnimatePresence>
-          {suggestions.length > 0 && (
+          {query.trim().length >= 1 && !selected && !notFound && (
             <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               className="absolute left-0 right-0 z-10 mt-2 overflow-hidden rounded-2xl border border-border/50 bg-card shadow-lg"
             >
-              {suggestions.map((s) => {
-                const detailed = isHalalStock(s);
-                const status = detailed ? s.status : "HALAL";
-                return (
-                  <button
-                    key={s.symbol}
-                    type="button"
-                    onClick={() => selectStock(s)}
-                    className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted"
-                  >
-                    <span className="font-ui font-semibold text-foreground">{s.symbol}</span>
-                    <span className="flex-1 truncate text-sm text-muted-foreground">
-                      {detailed ? s.name : s.sector}
-                    </span>
-                    <Badge className={`text-xs ${statusConfig[status].color}`}>
-                      {status}
-                    </Badge>
-                  </button>
-                );
-              })}
+              {suggestions.length > 0 ? (
+                suggestions.map((s) => {
+                  const detailed = isHalalStock(s);
+                  const status = detailed ? s.status : "HALAL";
+                  return (
+                    <button
+                      key={s.symbol}
+                      type="button"
+                      onClick={() => selectStock(s)}
+                      className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted"
+                    >
+                      <span className="font-ui font-semibold text-foreground">{s.symbol}</span>
+                      <span className="flex-1 truncate text-sm text-muted-foreground">
+                        {detailed ? s.name : s.sector}
+                      </span>
+                      <Badge className={`text-xs ${statusConfig[status].color}`}>
+                        {status}
+                      </Badge>
+                    </button>
+                  );
+                })
+              ) : (
+                <button
+                  type="submit"
+                  className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted"
+                >
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    Press Enter to screen <span className="font-semibold text-foreground">"{query.trim()}"</span>
+                  </span>
+                </button>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
