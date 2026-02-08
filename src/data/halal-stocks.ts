@@ -116,6 +116,8 @@ export function findStock(symbol: string): HalalStock | undefined {
   return halalStocks.find((s) => s.symbol === symbol.toUpperCase().trim());
 }
 
+export { loadDJIMData, type DJIMStock } from "./djim-stocks";
+
 export function findInIndex(
   symbol: string,
   index: ShariahIndexEntry[]
