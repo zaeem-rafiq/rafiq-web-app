@@ -9,6 +9,8 @@ import {
   Heart,
   Search,
   ExternalLink,
+  AlertTriangle,
+  ChevronDown,
 } from "lucide-react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
@@ -30,6 +32,7 @@ import {
   loadDJIMData,
   loadShariahIndex,
   searchShariahByName,
+  findStock,
   type DJIMStock,
   type ShariahIndexEntry,
 } from "@/data/halal-stocks";
@@ -161,8 +164,12 @@ export default function Zakat() {
     shares?: number;
     resolvedTicker?: string;
     inputWasResolved?: boolean;
+    isNotHalal?: boolean;
+    currentPrice?: number;
   } | null>(null);
   const [tatheerError, setTatheerError] = useState<string | null>(null);
+  const [costBasisInput, setCostBasisInput] = useState("");
+  const [showCostBasis, setShowCostBasis] = useState(false);
 
   // --- Ticker Autocomplete State ---
   const [tickerInput, setTickerInput] = useState("");
@@ -289,6 +296,10 @@ export default function Zakat() {
 
   // --- Tatheer Logic ---
   const handleTatheerLookup = async () => {
+    // Reset cost basis state on new lookup
+    setCostBasisInput("");
+    setShowCostBasis(false);
+
     // Resolve ticker from either ticker state or tickerInput
     let resolvedTicker = ticker.trim().toUpperCase();
     let wasResolvedFromIndex = false;
@@ -348,12 +359,20 @@ export default function Zakat() {
       // Determine if CF used FMP search to resolve (not resolved locally)
       const cfResolved = !wasResolvedFromIndex && (data.inputWasResolved === true);
 
+      // Detect haram status: backend-first, fallback to local halalStocks data
+      const resolvedSymbol = data.resolvedTicker || resolvedTicker;
+      const isNotHalal = data.isNotHalal === true
+        || findStock(resolvedSymbol)?.status === "NOT HALAL";
+      const price = Number(data.currentPrice) || undefined;
+
       if (data.hasDividend === false) {
         setTatheerData({
           hasDividend: false,
           companyName: data.companyName || displayFallback,
-          resolvedTicker: data.resolvedTicker || resolvedTicker,
+          resolvedTicker: resolvedSymbol,
           inputWasResolved: cfResolved,
+          isNotHalal,
+          currentPrice: price,
         });
       } else {
         setTatheerData({
@@ -367,8 +386,10 @@ export default function Zakat() {
           annualPurification: Number(data.annualPurification) || 0,
           quarterlyPurification: Number(data.quarterlyPurification) || 0,
           shares: Number(data.shares) || 0,
-          resolvedTicker: data.resolvedTicker || resolvedTicker,
+          resolvedTicker: resolvedSymbol,
           inputWasResolved: cfResolved,
+          isNotHalal,
+          currentPrice: price,
         });
       }
     } catch (err) {
@@ -403,6 +424,9 @@ export default function Zakat() {
       case "zakat":
         return result?.zakatDue ?? 0;
       case "tatheer":
+        if (tatheerData?.isNotHalal) {
+          return tatheerData?.totalAnnualDividends ?? 0;
+        }
         return tatheerData?.annualPurification ?? 0;
       case "khums":
         return khumsAmount;
@@ -835,6 +859,29 @@ export default function Zakat() {
                   animate={{ opacity: 1, y: 0 }}
                   className="space-y-4"
                 >
+                  {/* Haram stock warning banner */}
+                  {tatheerData.isNotHalal && (
+                    <div className="flex gap-3 rounded-2xl border border-red-300 bg-red-50 p-5">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                      <div className="space-y-2 text-sm text-red-800">
+                        <p className="font-semibold">
+                          {tatheerData.companyName} is classified as Not Halal
+                        </p>
+                        <p>
+                          Scholars recommend donating <strong>all</strong> dividend income
+                          from this stock to charity and selling your shares as soon as
+                          reasonably possible.
+                        </p>
+                        {tatheerData.hasDividend !== false && (
+                          <p>
+                            The amounts below reflect <strong>100%</strong> of your dividends,
+                            not just the non-compliant portion.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Resolution confirmation banner — shown when CF used FMP search */}
                   {tatheerData.inputWasResolved && (
                     <div className="flex gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4">
@@ -854,73 +901,193 @@ export default function Zakat() {
                   {tatheerData.hasDividend === false ? (
                     <div className="rounded-2xl border border-amber-500/20 bg-amber-50 p-5 text-center text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
                       <Info className="mx-auto mb-2 h-5 w-5" />
-                      This stock doesn't pay dividends. No purification is needed.
+                      {tatheerData.isNotHalal
+                        ? "This stock doesn't pay dividends, but it is still classified as not halal. Consider selling your shares."
+                        : "This stock doesn't pay dividends. No purification is needed."}
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {/* Quarterly Column */}
-                        <div className="space-y-3">
-                          <h4 className="font-heading text-xs font-semibold text-muted-foreground text-center">Quarterly</h4>
-                          <div className="rounded-2xl bg-muted/40 p-5 text-center">
-                            <p className="font-ui text-xs font-medium text-muted-foreground">
-                              Dividend / Share
-                            </p>
-                            <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
-                              ${(tatheerData.quarterlyDividend ?? 0).toFixed(4)}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl bg-muted/40 p-5 text-center">
-                            <p className="font-ui text-xs font-medium text-muted-foreground">
-                              Total Dividends
-                            </p>
-                            <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
-                              {fmt(tatheerData.totalQuarterlyDividends ?? 0)}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: "#C9A96220" }}>
-                            <p className="font-ui text-xs font-medium" style={{ color: "#C9A962" }}>
-                              Purification
-                            </p>
-                            <p className="mt-1.5 font-heading text-lg font-bold" style={{ color: "#C9A962" }}>
-                              {fmt(tatheerData.quarterlyPurification ?? 0)}
-                            </p>
-                          </div>
-                        </div>
-                        {/* Annual Column */}
-                        <div className="space-y-3">
-                          <h4 className="font-heading text-xs font-semibold text-muted-foreground text-center">Annual</h4>
-                          <div className="rounded-2xl bg-muted/40 p-5 text-center">
-                            <p className="font-ui text-xs font-medium text-muted-foreground">
-                              Dividend / Share
-                            </p>
-                            <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
-                              ${(tatheerData.annualDividend ?? 0).toFixed(2)}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl bg-muted/40 p-5 text-center">
-                            <p className="font-ui text-xs font-medium text-muted-foreground">
-                              Total Dividends
-                            </p>
-                            <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
-                              {fmt(tatheerData.totalAnnualDividends ?? 0)}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: "#C9A96220" }}>
-                            <p className="font-ui text-xs font-medium" style={{ color: "#C9A962" }}>
-                              Purification
-                            </p>
-                            <p className="mt-1.5 font-heading text-lg font-bold" style={{ color: "#C9A962" }}>
-                              {fmt(tatheerData.annualPurification ?? 0)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      {tatheerData.nonCompliantRatio != null && (
-                        <p className="text-center text-xs text-muted-foreground">
-                          Non-compliant ratio: {(tatheerData.nonCompliantRatio * 100).toFixed(2)}% — Based on latest annual income statement
-                        </p>
-                      )}
+                      {/* Compute display purification: 100% for haram, ratio-based otherwise */}
+                      {(() => {
+                        const displayQuarterlyPurification = tatheerData.isNotHalal
+                          ? (tatheerData.totalQuarterlyDividends ?? 0)
+                          : (tatheerData.quarterlyPurification ?? 0);
+                        const displayAnnualPurification = tatheerData.isNotHalal
+                          ? (tatheerData.totalAnnualDividends ?? 0)
+                          : (tatheerData.annualPurification ?? 0);
+
+                        return (
+                          <>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              {/* Quarterly Column */}
+                              <div className="space-y-3">
+                                <h4 className="font-heading text-xs font-semibold text-muted-foreground text-center">Quarterly</h4>
+                                <div className="rounded-2xl bg-muted/40 p-5 text-center">
+                                  <p className="font-ui text-xs font-medium text-muted-foreground">
+                                    Dividend / Share
+                                  </p>
+                                  <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
+                                    ${(tatheerData.quarterlyDividend ?? 0).toFixed(4)}
+                                  </p>
+                                </div>
+                                <div className="rounded-2xl bg-muted/40 p-5 text-center">
+                                  <p className="font-ui text-xs font-medium text-muted-foreground">
+                                    Total Dividends
+                                  </p>
+                                  <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
+                                    {fmt(tatheerData.totalQuarterlyDividends ?? 0)}
+                                  </p>
+                                </div>
+                                <div className={`rounded-2xl p-5 text-center ${tatheerData.isNotHalal ? "bg-red-50" : ""}`} style={tatheerData.isNotHalal ? {} : { backgroundColor: "#C9A96220" }}>
+                                  <p className={`font-ui text-xs font-medium ${tatheerData.isNotHalal ? "text-red-600" : ""}`} style={tatheerData.isNotHalal ? {} : { color: "#C9A962" }}>
+                                    {tatheerData.isNotHalal ? "Donate (100%)" : "Purification"}
+                                  </p>
+                                  <p className={`mt-1.5 font-heading text-lg font-bold ${tatheerData.isNotHalal ? "text-red-700" : ""}`} style={tatheerData.isNotHalal ? {} : { color: "#C9A962" }}>
+                                    {fmt(displayQuarterlyPurification)}
+                                  </p>
+                                </div>
+                              </div>
+                              {/* Annual Column */}
+                              <div className="space-y-3">
+                                <h4 className="font-heading text-xs font-semibold text-muted-foreground text-center">Annual</h4>
+                                <div className="rounded-2xl bg-muted/40 p-5 text-center">
+                                  <p className="font-ui text-xs font-medium text-muted-foreground">
+                                    Dividend / Share
+                                  </p>
+                                  <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
+                                    ${(tatheerData.annualDividend ?? 0).toFixed(2)}
+                                  </p>
+                                </div>
+                                <div className="rounded-2xl bg-muted/40 p-5 text-center">
+                                  <p className="font-ui text-xs font-medium text-muted-foreground">
+                                    Total Dividends
+                                  </p>
+                                  <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
+                                    {fmt(tatheerData.totalAnnualDividends ?? 0)}
+                                  </p>
+                                </div>
+                                <div className={`rounded-2xl p-5 text-center ${tatheerData.isNotHalal ? "bg-red-50" : ""}`} style={tatheerData.isNotHalal ? {} : { backgroundColor: "#C9A96220" }}>
+                                  <p className={`font-ui text-xs font-medium ${tatheerData.isNotHalal ? "text-red-600" : ""}`} style={tatheerData.isNotHalal ? {} : { color: "#C9A962" }}>
+                                    {tatheerData.isNotHalal ? "Donate (100%)" : "Purification"}
+                                  </p>
+                                  <p className={`mt-1.5 font-heading text-lg font-bold ${tatheerData.isNotHalal ? "text-red-700" : ""}`} style={tatheerData.isNotHalal ? {} : { color: "#C9A962" }}>
+                                    {fmt(displayAnnualPurification)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Non-compliant ratio or haram note */}
+                            {tatheerData.isNotHalal ? (
+                              <p className="text-center text-xs font-medium text-red-600">
+                                Non-halal stock — 100% of dividends should be donated to charity
+                              </p>
+                            ) : tatheerData.nonCompliantRatio != null ? (
+                              <p className="text-center text-xs text-muted-foreground">
+                                Non-compliant ratio: {(tatheerData.nonCompliantRatio * 100).toFixed(2)}% — Based on latest annual income statement
+                              </p>
+                            ) : null}
+
+                            {/* Cost basis → gains calculator (haram stocks only) */}
+                            {tatheerData.isNotHalal && (
+                              <div className="mt-2 space-y-3">
+                                <button
+                                  onClick={() => setShowCostBasis(!showCostBasis)}
+                                  className="flex w-full items-center justify-between rounded-xl border border-border/50 bg-muted/30 px-4 py-3 text-sm font-medium transition-colors hover:bg-muted/60"
+                                  style={{ color: "#2D5A3D" }}
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <Calculator className="h-4 w-4" />
+                                    Calculate total gains for donation
+                                  </span>
+                                  <ChevronDown className={`h-4 w-4 transition-transform ${showCostBasis ? "rotate-180" : ""}`} />
+                                </button>
+
+                                <AnimatePresence>
+                                  {showCostBasis && (
+                                    <motion.div
+                                      initial={{ opacity: 0, height: 0 }}
+                                      animate={{ opacity: 1, height: "auto" }}
+                                      exit={{ opacity: 0, height: 0 }}
+                                      className="overflow-hidden"
+                                    >
+                                      <div className="rounded-2xl border border-border/50 bg-muted/20 p-5 space-y-4">
+                                        <p className="text-xs text-muted-foreground">
+                                          If you know your cost basis (what you paid per share), enter it
+                                          below to calculate your total unrealized gains. Consider donating
+                                          this amount to charity when you sell.
+                                        </p>
+                                        <div>
+                                          <Label className="text-xs font-medium text-muted-foreground">
+                                            Cost Basis per Share ($)
+                                          </Label>
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            placeholder="e.g. 120.50"
+                                            value={costBasisInput}
+                                            onChange={(e) => setCostBasisInput(e.target.value)}
+                                            className="mt-1"
+                                          />
+                                        </div>
+                                        {costBasisInput && parseFloat(costBasisInput) > 0 && tatheerData.currentPrice ? (
+                                          (() => {
+                                            const costBasis = parseFloat(costBasisInput);
+                                            const currentPrice = tatheerData.currentPrice;
+                                            const numShares = tatheerData.shares ?? 0;
+                                            const totalGain = (currentPrice - costBasis) * numShares;
+                                            const totalDonation = (tatheerData.totalAnnualDividends ?? 0) + Math.max(totalGain, 0);
+                                            return (
+                                              <div className="space-y-3">
+                                                <div className="grid grid-cols-2 gap-3 text-center">
+                                                  <div className="rounded-xl bg-white p-3">
+                                                    <p className="text-xs text-muted-foreground">Current Price</p>
+                                                    <p className="font-heading text-sm font-bold text-foreground">{fmt(currentPrice)}</p>
+                                                  </div>
+                                                  <div className="rounded-xl bg-white p-3">
+                                                    <p className="text-xs text-muted-foreground">Your Cost Basis</p>
+                                                    <p className="font-heading text-sm font-bold text-foreground">{fmt(costBasis)}</p>
+                                                  </div>
+                                                </div>
+                                                <div className={`rounded-xl p-4 text-center ${totalGain >= 0 ? "bg-red-50" : "bg-amber-50"}`}>
+                                                  <p className="text-xs text-muted-foreground">
+                                                    {totalGain >= 0 ? "Unrealized Gains" : "Unrealized Loss"} ({numShares} shares)
+                                                  </p>
+                                                  <p className={`font-heading text-xl font-bold ${totalGain >= 0 ? "text-red-700" : "text-amber-700"}`}>
+                                                    {totalGain >= 0 ? fmt(totalGain) : `−${fmt(Math.abs(totalGain))}`}
+                                                  </p>
+                                                </div>
+                                                {totalGain > 0 && (
+                                                  <div className="rounded-xl p-4 text-center" style={{ backgroundColor: "#C9A96220" }}>
+                                                    <p className="text-xs font-medium" style={{ color: "#C9A962" }}>
+                                                      Total Recommended Donation
+                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                                                      Annual Dividends + Unrealized Gains
+                                                    </p>
+                                                    <p className="mt-1 font-heading text-xl font-bold" style={{ color: "#C9A962" }}>
+                                                      {fmt(totalDonation)}
+                                                    </p>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })()
+                                        ) : costBasisInput && parseFloat(costBasisInput) > 0 && !tatheerData.currentPrice ? (
+                                          <p className="text-xs text-amber-600">
+                                            Current stock price unavailable. Try looking up the stock again.
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
                 </motion.div>

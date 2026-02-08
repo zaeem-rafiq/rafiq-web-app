@@ -5,11 +5,25 @@ const fmpApiKey = defineSecret("FMP_API_KEY");
 
 const FMP_BASE = "https://financialmodelingprep.com/stable";
 
+const NOT_HALAL_SYMBOLS = new Set([
+  // Banks & Financial Services
+  "JPM", "BAC", "WFC", "GS", "MS", "C", "USB", "PNC", "COF", "SCHW",
+  // Insurance
+  "BRK.B", "AIG", "MET", "PRU", "ALL", "TRV",
+  // Alcohol
+  "DEO", "BUD", "STZ",
+  // Tobacco
+  "PM", "MO", "BATS",
+  // Gambling
+  "MGM", "LVS", "WYNN", "DKNG", "CZR",
+]);
+
 interface FmpProfile {
   companyName?: string;
   lastDiv?: number;
   lastDividend?: number;
   symbol?: string;
+  price?: number;
 }
 
 interface FmpDividendEntry {
@@ -156,11 +170,13 @@ export const getTatheerData = onCall(
     // --- Profile ---
     let companyName = resolvedTicker;
     let lastDiv = 0;
+    let currentPrice = 0;
     if (profileResp.ok) {
       const profileData: FmpProfile[] = await profileResp.json();
       if (profileData?.[0]) {
         companyName = profileData[0].companyName || resolvedTicker;
         lastDiv = profileData[0].lastDiv || profileData[0].lastDividend || 0;
+        currentPrice = profileData[0].price || 0;
       }
     }
 
@@ -242,6 +258,8 @@ export const getTatheerData = onCall(
     const annualPurification = totalAnnualDividends * nonCompliantRatio;
     const quarterlyPurification = totalQuarterlyDividends * nonCompliantRatio;
 
+    const isNotHalal = NOT_HALAL_SYMBOLS.has(resolvedTicker);
+
     const result = {
       companyName,
       annualDividend,
@@ -257,6 +275,8 @@ export const getTatheerData = onCall(
       hasDividend,
       resolvedTicker,
       inputWasResolved: !isTickerFormat,
+      currentPrice,
+      isNotHalal,
     };
 
     console.log("getTatheerData result:", JSON.stringify(result));
