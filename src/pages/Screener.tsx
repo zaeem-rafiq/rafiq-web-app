@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, CheckCircle2, XCircle, AlertTriangle, TrendingUp, Info } from "lucide-react";
+import { Search, CheckCircle2, XCircle, AlertTriangle, TrendingUp, Info, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { Input } from "@/components/ui/input";
@@ -17,21 +17,27 @@ import {
   type HalalStock,
   type ShariahIndexEntry,
 } from "@/data/halal-stocks";
+import { isDJIMStock } from "@/data/djim-stocks";
 
 const askRafiq = httpsCallable(functions, "askRafiqWeb");
+
+interface ScreeningRatios {
+  debtRatio: number;
+  interestIncome: number;
+  cashSecurities: number;
+  businessActivity: "PASS" | "FAIL" | "QUESTIONABLE";
+}
 
 interface LiveScreeningResult {
   symbol: string;
   name: string;
   sector: string;
+  industry?: string;
   status: "HALAL" | "NOT HALAL" | "QUESTIONABLE";
-  ratios: {
-    debtRatio: number;
-    interestIncome: number;
-    cashSecurities: number;
-    businessActivity: "PASS" | "FAIL" | "QUESTIONABLE";
-  };
+  ratios: ScreeningRatios | null;
   notes: string;
+  isShariahIndexConstituent: boolean;
+  indexName: "S&P 500 Shariah" | "DJIM" | null;
 }
 
 function buildScreeningPrompt(ticker: string): string {
@@ -61,6 +67,7 @@ You MUST respond with ONLY a JSON code block in this exact format, no other text
   "symbol": "${ticker}",
   "name": "Full Company Name",
   "sector": "Sector Name",
+  "industry": "Industry Name",
   "status": "HALAL | NOT HALAL | QUESTIONABLE",
   "ratios": {
     "debtRatio": 0.0,
@@ -75,7 +82,7 @@ You MUST respond with ONLY a JSON code block in this exact format, no other text
 
 function parseLiveScreeningResponse(
   response: string
-): LiveScreeningResult | null {
+): Omit<LiveScreeningResult, "isShariahIndexConstituent" | "indexName"> | null {
   try {
     const jsonBlockMatch = response.match(/```json\s*([\s\S]*?)```/);
     const rawJson = jsonBlockMatch ? jsonBlockMatch[1].trim() : response.trim();
@@ -98,6 +105,7 @@ function parseLiveScreeningResponse(
       symbol: parsed.symbol.toUpperCase(),
       name: parsed.name,
       sector: parsed.sector,
+      industry: typeof parsed.industry === "string" ? parsed.industry : undefined,
       status: parsed.status,
       ratios: {
         debtRatio: parsed.ratios.debtRatio,
@@ -156,12 +164,35 @@ function RatioCard({
   );
 }
 
+function DisabledRatioCard({ label }: { label: string }) {
+  return (
+    <div className="rounded-2xl border border-border/50 bg-muted/30 p-5 shadow-sm opacity-60">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="font-ui text-sm font-medium text-muted-foreground">{label}</span>
+        <AlertTriangle className="h-5 w-5 text-muted-foreground/50" />
+      </div>
+      <div className="mb-2 font-heading text-lg font-bold text-muted-foreground">
+        &mdash;
+      </div>
+      <Progress value={0} className="h-2 bg-muted [&>div]:bg-muted-foreground" />
+      <p className="mt-2 text-xs text-muted-foreground">
+        Ratio data temporarily unavailable
+      </p>
+    </div>
+  );
+}
+
+function SectorIndustryLabel({ sector, industry }: { sector: string; industry?: string }) {
+  if (!industry || industry === sector) {
+    return <p className="text-xs text-muted-foreground">{sector}</p>;
+  }
+  return <p className="text-xs text-muted-foreground">{sector} &bull; {industry}</p>;
+}
+
 export default function Screener() {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<HalalStock | ShariahIndexEntry | null>(null);
   const [suggestions, setSuggestions] = useState<(HalalStock | ShariahIndexEntry)[]>([]);
   const [shariahIndex, setShariahIndex] = useState<ShariahIndexEntry[]>([]);
-  const [notFound, setNotFound] = useState(false);
   const [liveScreening, setLiveScreening] = useState(false);
   const [liveResult, setLiveResult] = useState<LiveScreeningResult | null>(null);
   const [liveRawResponse, setLiveRawResponse] = useState<string | null>(null);
@@ -173,8 +204,6 @@ export default function Screener() {
 
   const handleSearch = (val: string) => {
     setQuery(val);
-    setSelected(null);
-    setNotFound(false);
     setLiveResult(null);
     setLiveRawResponse(null);
     setLiveError(null);
@@ -186,45 +215,42 @@ export default function Screener() {
     }
   };
 
-  const selectStock = (stock: HalalStock | ShariahIndexEntry) => {
-    setSelected(stock);
-    setQuery(stock.symbol);
-    setSuggestions([]);
+  const getIndexMembership = (ticker: string): Pick<LiveScreeningResult, "isShariahIndexConstituent" | "indexName"> => {
+    const inDJIM = isDJIMStock(ticker);
+    const inShariahIndex = !!findInIndex(ticker, shariahIndex);
+    if (inDJIM) return { isShariahIndexConstituent: true, indexName: "DJIM" };
+    if (inShariahIndex) return { isShariahIndexConstituent: true, indexName: "S&P 500 Shariah" };
+    return { isShariahIndexConstituent: false, indexName: null };
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim() || liveScreening) return;
+  const screenTicker = async (tickerInput: string) => {
+    const ticker = tickerInput.trim().toUpperCase();
+    if (!ticker || liveScreening) return;
 
-    // Reset live screening state
+    // Reset state
     setLiveResult(null);
     setLiveRawResponse(null);
     setLiveError(null);
+    setSuggestions([]);
 
-    const ticker = query.trim().toUpperCase();
+    const membership = getIndexMembership(ticker);
 
-    // Try local detailed stocks
+    // Check local pre-screened data (already has AAOIFI ratios)
     const found = findStock(ticker);
     if (found) {
-      setSelected(found);
-      setSuggestions([]);
-      setNotFound(false);
+      setLiveResult({
+        symbol: found.symbol,
+        name: found.name,
+        sector: found.sector,
+        status: found.status,
+        ratios: found.ratios,
+        notes: "",
+        ...membership,
+      });
       return;
     }
 
-    // Try shariah index
-    const indexEntry = findInIndex(ticker, shariahIndex);
-    if (indexEntry) {
-      setSelected(indexEntry);
-      setSuggestions([]);
-      setNotFound(false);
-      return;
-    }
-
-    // Not found locally — trigger live AAOIFI screening
-    setSelected(null);
-    setSuggestions([]);
-    setNotFound(true);
+    // Not in pre-screened data — always run live AAOIFI screening via AI
     setLiveScreening(true);
 
     try {
@@ -234,20 +260,45 @@ export default function Screener() {
 
       const parsed = parseLiveScreeningResponse(response);
       if (parsed) {
-        setLiveResult(parsed);
+        setLiveResult({
+          ...parsed,
+          ...membership,
+        });
       } else {
         setLiveRawResponse(response);
       }
     } catch (err) {
       console.error("Live screening error:", err);
-      setLiveError("Could not complete live screening. Please try again later.");
+      if (membership.isShariahIndexConstituent) {
+        // Fallback: index membership with skeleton ratios
+        const indexEntry = findInIndex(ticker, shariahIndex);
+        setLiveResult({
+          symbol: ticker,
+          name: ticker,
+          sector: indexEntry?.sector || "",
+          status: "HALAL",
+          ratios: null,
+          notes: "Financial data temporarily unavailable — compliance based on Shariah index inclusion",
+          ...membership,
+        });
+      } else {
+        setLiveError("Could not complete live screening. Please try again later.");
+      }
     } finally {
       setLiveScreening(false);
     }
   };
 
-  const selectedIsDetailed = selected && isHalalStock(selected);
-  const cfg = selectedIsDetailed ? statusConfig[selected.status] : selected ? statusConfig["HALAL"] : null;
+  const selectStock = (stock: HalalStock | ShariahIndexEntry) => {
+    setQuery(stock.symbol);
+    setSuggestions([]);
+    screenTicker(stock.symbol);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    screenTicker(query);
+  };
 
   return (
     <main className="container mx-auto max-w-3xl px-4 py-10 sm:py-14">
@@ -275,7 +326,7 @@ export default function Screener() {
 
         {/* Dropdown suggestions */}
         <AnimatePresence>
-          {query.trim().length >= 1 && !selected && !notFound && (
+          {query.trim().length >= 1 && !liveResult && !liveScreening && !liveError && !liveRawResponse && (
             <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
@@ -321,9 +372,9 @@ export default function Screener() {
 
       {/* Results */}
       <AnimatePresence mode="wait">
-        {selected && cfg ? (
+        {liveResult ? (
           <motion.div
-            key={selected.symbol}
+            key={`result-${liveResult.symbol}`}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
@@ -337,91 +388,106 @@ export default function Screener() {
                     <TrendingUp className="h-7 w-7 text-primary" />
                   </div>
                   <div>
-                    <h2 className="font-heading text-xl font-bold text-foreground">{selected.symbol}</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedIsDetailed ? selected.name : selected.sector}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{selected.sector}</p>
+                    <h2 className="font-heading text-xl font-bold text-foreground">{liveResult.symbol}</h2>
+                    <p className="text-sm text-muted-foreground">{liveResult.name}</p>
+                    <SectorIndustryLabel sector={liveResult.sector} industry={liveResult.industry} />
                   </div>
                 </div>
-                <Badge className={`px-4 py-1.5 font-ui text-sm font-bold ${cfg.color}`}>
-                  <cfg.icon className="mr-1.5 h-4 w-4" />
-                  {cfg.label}
+                <Badge className={`px-4 py-1.5 font-ui text-sm font-bold ${statusConfig[liveResult.status].color}`}>
+                  {(() => { const Icon = statusConfig[liveResult.status].icon; return <Icon className="mr-1.5 h-4 w-4" />; })()}
+                  {statusConfig[liveResult.status].label}
                 </Badge>
               </CardContent>
             </Card>
 
-            {/* AAOIFI Ratios */}
-            {selectedIsDetailed ? (
-              <Card className="border-border/50 bg-card shadow-sm">
-                <CardHeader className="pb-4">
-                  <CardTitle className="font-heading text-lg">AAOIFI Screening Criteria</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <RatioCard
-                      label="Debt Ratio"
-                      value={selected.ratios.debtRatio}
-                      threshold={33}
-                      unit="<"
-                      pass={selected.ratios.debtRatio < 33}
-                    />
-                    <RatioCard
-                      label="Interest Income"
-                      value={selected.ratios.interestIncome}
-                      threshold={5}
-                      unit="<"
-                      pass={selected.ratios.interestIncome < 5}
-                    />
-                    <RatioCard
-                      label="Cash & Securities"
-                      value={selected.ratios.cashSecurities}
-                      threshold={33}
-                      unit="<"
-                      pass={selected.ratios.cashSecurities < 33}
-                    />
-                    <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="font-ui text-sm font-medium text-foreground">Business Activity</span>
-                        {selected.ratios.businessActivity === "PASS" ? (
-                          <CheckCircle2 className="h-5 w-5 text-halal" />
-                        ) : selected.ratios.businessActivity === "FAIL" ? (
-                          <XCircle className="h-5 w-5 text-haram" />
-                        ) : (
-                          <AlertTriangle className="h-5 w-5 text-questionable" />
-                        )}
+            {/* AAOIFI Screening Criteria */}
+            <Card className="mb-6 border-border/50 bg-card shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="font-heading text-lg">AAOIFI Screening Criteria</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {liveResult.ratios ? (
+                    <>
+                      <RatioCard label="Debt Ratio" value={liveResult.ratios.debtRatio} threshold={33} unit="<" pass={liveResult.ratios.debtRatio < 33} />
+                      <RatioCard label="Interest Income" value={liveResult.ratios.interestIncome} threshold={5} unit="<" pass={liveResult.ratios.interestIncome < 5} />
+                      <RatioCard label="Cash & Securities" value={liveResult.ratios.cashSecurities} threshold={33} unit="<" pass={liveResult.ratios.cashSecurities < 33} />
+                      <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
+                        <div className="mb-3 flex items-center justify-between">
+                          <span className="font-ui text-sm font-medium text-foreground">Business Activity</span>
+                          {liveResult.ratios.businessActivity === "PASS" ? (
+                            <CheckCircle2 className="h-5 w-5 text-halal" />
+                          ) : liveResult.ratios.businessActivity === "FAIL" ? (
+                            <XCircle className="h-5 w-5 text-haram" />
+                          ) : (
+                            <AlertTriangle className="h-5 w-5 text-questionable" />
+                          )}
+                        </div>
+                        <div className="font-heading text-2xl font-bold text-foreground">
+                          {liveResult.ratios.businessActivity}
+                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Core business must be Shariah-compliant
+                        </p>
                       </div>
-                      <div className="font-heading text-2xl font-bold text-foreground">
-                        {selected.ratios.businessActivity}
-                      </div>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Core business must be Shariah-compliant
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="border-border/50 bg-card shadow-sm">
-                <CardContent className="p-7">
+                    </>
+                  ) : (
+                    <>
+                      <DisabledRatioCard label="Debt Ratio" />
+                      <DisabledRatioCard label="Interest Income" />
+                      <DisabledRatioCard label="Cash & Securities" />
+                      <DisabledRatioCard label="Business Activity" />
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Shariah Index Constituent badge */}
+            {liveResult.isShariahIndexConstituent && (
+              <Card className="mb-6 border-border/50 bg-card shadow-sm">
+                <CardContent className="p-5">
                   <div className="flex items-start gap-3">
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-halal" />
+                    <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-halal" />
                     <div>
                       <p className="font-ui text-sm font-medium text-foreground">
-                        Shariah Index Constituent
+                        ✓ Shariah Index Constituent
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        This stock is included in the Dow Jones Islamic Market / S&P Shariah Index
-                        and has passed Shariah screening criteria. Detailed AAOIFI ratio breakdowns
-                        are not yet available for this stock.
+                        This stock is included in the{" "}
+                        {liveResult.indexName === "DJIM"
+                          ? "Dow Jones Islamic Market (DJIM) Index"
+                          : "S&P 500 Shariah Index"}
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             )}
+
+            {/* Notes / explanation */}
+            {liveResult.notes && (
+              <Card className="mb-4 border-border/50 bg-card shadow-sm">
+                <CardContent className="p-5">
+                  <p className="text-sm text-muted-foreground">{liveResult.notes}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* AI-Generated Screening disclaimer — shown on EVERY result */}
+            <div className="flex items-start gap-3 rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-4">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-yellow-600" />
+              <div>
+                <p className="font-ui text-sm font-medium text-foreground">AI-Generated Screening</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  This result was generated by AI based on publicly available financial data and is not
+                  verified by a certified Shariah auditor. Financial ratios may not reflect the most
+                  recent filings. Please consult a qualified Islamic scholar before making investment decisions.
+                </p>
+              </div>
+            </div>
           </motion.div>
-        ) : notFound && liveScreening ? (
+        ) : liveScreening ? (
           <motion.div
             key="live-screening-loading"
             initial={{ opacity: 0, y: 16 }}
@@ -465,85 +531,7 @@ export default function Screener() {
               Performing live AAOIFI screening for {query.toUpperCase()}...
             </p>
           </motion.div>
-        ) : notFound && liveResult ? (
-          <motion.div
-            key={`live-${liveResult.symbol}`}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Card className="mb-6 border-border/50 bg-card shadow-sm">
-              <CardContent className="flex flex-col items-start gap-4 p-7 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                    <TrendingUp className="h-7 w-7 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="font-heading text-xl font-bold text-foreground">{liveResult.symbol}</h2>
-                    <p className="text-sm text-muted-foreground">{liveResult.name}</p>
-                    <p className="text-xs text-muted-foreground">{liveResult.sector}</p>
-                  </div>
-                </div>
-                <Badge className={`px-4 py-1.5 font-ui text-sm font-bold ${statusConfig[liveResult.status].color}`}>
-                  {(() => { const Icon = statusConfig[liveResult.status].icon; return <Icon className="mr-1.5 h-4 w-4" />; })()}
-                  {statusConfig[liveResult.status].label}
-                </Badge>
-              </CardContent>
-            </Card>
-
-            <Card className="mb-6 border-border/50 bg-card shadow-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="font-heading text-lg">AAOIFI Screening Criteria</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <RatioCard label="Debt Ratio" value={liveResult.ratios.debtRatio} threshold={33} unit="<" pass={liveResult.ratios.debtRatio < 33} />
-                  <RatioCard label="Interest Income" value={liveResult.ratios.interestIncome} threshold={5} unit="<" pass={liveResult.ratios.interestIncome < 5} />
-                  <RatioCard label="Cash & Securities" value={liveResult.ratios.cashSecurities} threshold={33} unit="<" pass={liveResult.ratios.cashSecurities < 33} />
-                  <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between">
-                      <span className="font-ui text-sm font-medium text-foreground">Business Activity</span>
-                      {liveResult.ratios.businessActivity === "PASS" ? (
-                        <CheckCircle2 className="h-5 w-5 text-halal" />
-                      ) : liveResult.ratios.businessActivity === "FAIL" ? (
-                        <XCircle className="h-5 w-5 text-haram" />
-                      ) : (
-                        <AlertTriangle className="h-5 w-5 text-questionable" />
-                      )}
-                    </div>
-                    <div className="font-heading text-2xl font-bold text-foreground">
-                      {liveResult.ratios.businessActivity}
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Core business must be Shariah-compliant
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {liveResult.notes && (
-              <Card className="mb-4 border-border/50 bg-card shadow-sm">
-                <CardContent className="p-5">
-                  <p className="text-sm text-muted-foreground">{liveResult.notes}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            <div className="flex items-start gap-3 rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-4">
-              <Info className="mt-0.5 h-5 w-5 shrink-0 text-yellow-600" />
-              <div>
-                <p className="font-ui text-sm font-medium text-foreground">AI-Generated Screening</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  This result was generated by AI based on publicly available financial data and is not
-                  verified by a certified Shariah auditor. Financial ratios may not reflect the most
-                  recent filings. Please consult a qualified Islamic scholar before making investment decisions.
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        ) : notFound && liveRawResponse ? (
+        ) : liveRawResponse ? (
           <motion.div
             key="live-markdown"
             initial={{ opacity: 0, y: 16 }}
@@ -576,7 +564,7 @@ export default function Screener() {
               </div>
             </div>
           </motion.div>
-        ) : notFound && liveError ? (
+        ) : liveError ? (
           <motion.div
             key="live-error"
             initial={{ opacity: 0, y: 16 }}
