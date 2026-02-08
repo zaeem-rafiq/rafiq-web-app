@@ -11,7 +11,7 @@ const navLinks = [{
   label: "Screener"
 }, {
   to: "/zakat",
-  label: "Zakat"
+  label: "Give"
 }, {
   to: "/ask",
   label: "Ask Rafiq"
