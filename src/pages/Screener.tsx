@@ -64,6 +64,7 @@ export default function Screener() {
   const [selected, setSelected] = useState<HalalStock | ShariahIndexEntry | null>(null);
   const [suggestions, setSuggestions] = useState<(HalalStock | ShariahIndexEntry)[]>([]);
   const [shariahIndex, setShariahIndex] = useState<ShariahIndexEntry[]>([]);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     loadShariahIndex().then(setShariahIndex);
@@ -71,6 +72,7 @@ export default function Screener() {
 
   const handleSearch = (val: string) => {
     setQuery(val);
+    setNotFound(false);
     if (val.trim().length >= 1) {
       setSuggestions(searchExtended(val, shariahIndex).slice(0, 8));
     } else {
@@ -86,17 +88,25 @@ export default function Screener() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!query.trim()) return;
     const found = findStock(query);
     if (found) {
       setSelected(found);
       setSuggestions([]);
+      setNotFound(false);
     } else {
       const indexEntry = findInIndex(query, shariahIndex);
       if (indexEntry) {
         setSelected(indexEntry);
         setSuggestions([]);
+        setNotFound(false);
       } else if (suggestions.length > 0) {
         selectStock(suggestions[0]);
+        setNotFound(false);
+      } else {
+        setSelected(null);
+        setSuggestions([]);
+        setNotFound(true);
       }
     }
   };
@@ -263,6 +273,26 @@ export default function Screener() {
                 </CardContent>
               </Card>
             )}
+          </motion.div>
+        ) : notFound ? (
+          <motion.div
+            key="not-found"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.3 }}
+            className="flex flex-col items-center gap-4 py-20 text-center"
+          >
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+              <XCircle className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <p className="font-heading text-lg font-semibold text-foreground">
+              Stock not found
+            </p>
+            <p className="max-w-sm text-sm text-muted-foreground">
+              "{query.toUpperCase()}" is not in our database of 2,127 pre-screened stocks.
+              This doesn't necessarily mean it's not Shariah-compliant — it just hasn't been screened yet.
+            </p>
           </motion.div>
         ) : (
           <motion.div
