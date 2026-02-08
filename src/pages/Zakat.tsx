@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Calculator, ArrowRight, ArrowLeft, Info, DollarSign } from "lucide-react";
+import { Calculator, ArrowRight, ArrowLeft, Info, DollarSign, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -317,6 +317,91 @@ export default function Zakat() {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Pay Your Zakat — only shown when zakat is due */}
+            {result.zakatDue > 0 && (
+              <div className="mt-8 space-y-6">
+                <div className="text-center">
+                  <h2 className="font-heading text-2xl font-bold text-foreground">
+                    Pay Your Zakat
+                  </h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Fulfill your obligation through trusted platforms
+                  </p>
+                </div>
+
+                {/* LaunchGood CTA */}
+                <a
+                  href="https://www.launchgood.com/discover#checks[categories]=Zakat"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 rounded-2xl px-6 py-4 font-ui text-base font-semibold shadow-sm transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: "#C9A962", color: "#2C2C2C" }}
+                >
+                  Give on LaunchGood <ExternalLink size={16} />
+                </a>
+
+                {/* Recommended Charities */}
+                <div>
+                  <h3 className="mb-4 font-heading text-lg font-semibold" style={{ color: "#1B4D3E" }}>
+                    Recommended Charities
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {[
+                      {
+                        name: "Islamic Relief USA",
+                        url: "https://www.every.org/islamic-relief-usa",
+                        desc: "Global humanitarian aid and development",
+                      },
+                      {
+                        name: "ICNA Relief",
+                        url: "https://www.every.org/icna-relief",
+                        desc: "Emergency relief and social services across North America",
+                      },
+                      {
+                        name: "Helping Hand for Relief and Development",
+                        url: "https://www.every.org/hhrd",
+                        desc: "Disaster relief and community development worldwide",
+                      },
+                      {
+                        name: "Penny Appeal USA",
+                        url: "https://www.every.org/penny-appeal-usa",
+                        desc: "Fighting poverty with sustainable development programs",
+                      },
+                      {
+                        name: "Zakat Foundation of America",
+                        url: "https://www.every.org/zakat-foundation-of-america",
+                        desc: "Zakat collection and distribution to eligible recipients",
+                      },
+                    ].map((charity) => (
+                      <a
+                        key={charity.name}
+                        href={charity.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block rounded-2xl border border-border/40 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                      >
+                        <p className="font-ui text-sm font-semibold" style={{ color: "#1B4D3E" }}>
+                          {charity.name}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">{charity.desc}</p>
+                        <span
+                          className="mt-3 inline-flex items-center gap-1 font-ui text-xs font-semibold"
+                          style={{ color: "#C9A962" }}
+                        >
+                          Donate <ArrowRight size={12} />
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Disclaimer */}
+                <p className="text-center text-xs text-muted-foreground">
+                  Rafiq does not process donations directly. You will be redirected to the charity's page.
+                </p>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
