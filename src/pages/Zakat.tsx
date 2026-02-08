@@ -288,8 +288,12 @@ export default function Zakat() {
       if (match) {
         resolvedTicker = match.symbol;
       } else {
-        // Fallback: send raw input uppercased (FMP can handle unknown tickers)
-        resolvedTicker = tickerInput.trim().toUpperCase();
+        // Fallback: clean company name and send to API (FMP search will resolve)
+        // Strip common suffixes that confuse FMP search
+        const cleaned = tickerInput.trim()
+          .replace(/\b(Inc\.?|Corp\.?|Co\.?|Ltd\.?|LLC|PLC|Group|Company|Corporation|Incorporated)\s*$/i, "")
+          .trim();
+        resolvedTicker = (cleaned || tickerInput.trim()).toUpperCase();
       }
     } else {
       return; // Nothing to look up
