@@ -7,6 +7,8 @@ export interface ZakatAssets {
   silver: number;     // grams
   investments: number;
   businessInventory: number;
+  livestock: number;  // USD value
+  crops: number;      // USD value
   debtsOwed: number;
 }
 
@@ -29,17 +31,11 @@ export interface ZakatResult {
     zakatOn: number;
   }[];
   isJafari: boolean;
-  khums?: {
-    applicable: boolean;
-    rate: number;
-    categories: string[];
-  };
 }
 
 const NISAB_GOLD_GRAMS = 85;   // 85 grams of gold
 const NISAB_SILVER_GRAMS = 595; // 595 grams of silver
 const ZAKAT_RATE = 0.025;       // 2.5%
-const KHUMS_RATE = 0.20;        // 20%
 
 export function calculateZakat(
   assets: ZakatAssets,
@@ -53,7 +49,9 @@ export function calculateZakat(
   const goldValue = assets.gold * prices.goldPerGram;
   const silverValue = assets.silver * prices.silverPerGram;
 
-  const totalAssets = assets.cash + goldValue + silverValue + assets.investments + assets.businessInventory;
+  const totalAssets = isJafari
+    ? goldValue + silverValue + assets.livestock + assets.crops
+    : assets.cash + goldValue + silverValue + assets.investments + assets.businessInventory;
   const totalDeductions = assets.debtsOwed;
   const netWorth = totalAssets - totalDeductions;
 
@@ -75,23 +73,19 @@ export function calculateZakat(
   const breakdown: ZakatResult["breakdown"] = [];
 
   if (isJafari) {
-    // Ja'fari: Zakat only on gold, silver, livestock, crops
-    // Cash & investments fall under Khums
-    const zakatableGold = goldValue;
-    const zakatableSilver = silverValue;
-    const zakatOnGoldSilver = isAboveNisab ? (zakatableGold + zakatableSilver) * ZAKAT_RATE : 0;
+    // Ja'fari: Zakat applies only to gold, silver, livestock, and crops
+    // Cash & investments fall under Khums (handled in the Khums tab)
+    if (isAboveNisab) {
+      zakatDue = netWorth * ZAKAT_RATE;
+    }
 
     breakdown.push(
       { category: "Gold", amount: goldValue, zakatOn: isAboveNisab ? goldValue * ZAKAT_RATE : 0 },
       { category: "Silver", amount: silverValue, zakatOn: isAboveNisab ? silverValue * ZAKAT_RATE : 0 },
-      { category: "Cash (Khums)", amount: assets.cash, zakatOn: assets.cash * KHUMS_RATE },
-      { category: "Investments (Khums)", amount: assets.investments, zakatOn: assets.investments * KHUMS_RATE },
-      { category: "Business Inventory (Khums)", amount: assets.businessInventory, zakatOn: assets.businessInventory * KHUMS_RATE },
+      { category: "Livestock", amount: assets.livestock, zakatOn: isAboveNisab ? assets.livestock * ZAKAT_RATE : 0 },
+      { category: "Agricultural Produce", amount: assets.crops, zakatOn: isAboveNisab ? assets.crops * ZAKAT_RATE : 0 },
       { category: "Debts Owed", amount: -assets.debtsOwed, zakatOn: 0 },
     );
-
-    zakatDue = zakatOnGoldSilver +
-      (assets.cash + assets.investments + assets.businessInventory) * KHUMS_RATE;
   } else {
     // Standard Sunni calculation
     if (isAboveNisab) {
@@ -118,12 +112,5 @@ export function calculateZakat(
     isAboveNisab,
     breakdown,
     isJafari,
-    khums: isJafari
-      ? {
-          applicable: true,
-          rate: KHUMS_RATE,
-          categories: ["Cash", "Investments", "Business Inventory"],
-        }
-      : undefined,
   };
 }
