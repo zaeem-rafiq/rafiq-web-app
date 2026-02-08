@@ -11,5 +11,6 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const functions = getFunctions(app);
-export { httpsCallable };
+const functions = getFunctions(app);
+
+export { functions, httpsCallable };
