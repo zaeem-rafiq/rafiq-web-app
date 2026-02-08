@@ -138,9 +138,18 @@ export default function Zakat() {
   const [shares, setShares] = useState<number>(0);
   const [tatheerLoading, setTatheerLoading] = useState(false);
   const [tatheerData, setTatheerData] = useState<{
-    dividendPerShare: number | null;
     companyName: string;
-    impureRatio?: number;
+    annualDividend: number;
+    quarterlyDividend: number;
+    frequency: string;
+    totalAnnualDividends: number;
+    totalQuarterlyDividends: number;
+    nonCompliantRatio: number;
+    annualPurification: number;
+    quarterlyPurification: number;
+    shares: number;
+    dataSource: string;
+    hasDividend: boolean;
   } | null>(null);
   const [tatheerError, setTatheerError] = useState<string | null>(null);
 
@@ -208,28 +217,34 @@ export default function Zakat() {
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ ticker: ticker.trim().toUpperCase() }),
+          body: JSON.stringify({ ticker: ticker.trim().toUpperCase(), shares }),
         }
       );
       const raw = await resp.json();
       // Log raw response for debugging
       console.log("getTatheerData raw response:", raw);
 
-      // Handle nested response structures: result.data.dividendPerShare or result.dividendPerShare
+      // Handle nested response structures
       const data = raw.data || raw;
-      const rawDividend = data.dividendPerShare ?? data.dividend_per_share ?? null;
-      const parsedDividend =
-        typeof rawDividend === "number" ? rawDividend : parseFloat(rawDividend);
 
-      // If dividendPerShare is NaN, undefined, or 0, treat as unavailable
-      const isValidDividend =
-        parsedDividend != null && !isNaN(parsedDividend) && parsedDividend !== 0;
+      const safeNum = (v: unknown) => {
+        const n = typeof v === "number" ? v : parseFloat(v as string);
+        return isNaN(n) ? 0 : n;
+      };
 
       setTatheerData({
-        dividendPerShare: isValidDividend ? parsedDividend : null,
-        companyName:
-          data.companyName || data.company_name || ticker.trim().toUpperCase(),
-        impureRatio: data.impureRatio ?? data.impure_ratio ?? data.purificationRatio,
+        companyName: data.companyName || ticker.trim().toUpperCase(),
+        annualDividend: safeNum(data.annualDividend),
+        quarterlyDividend: safeNum(data.quarterlyDividend),
+        frequency: data.frequency || "",
+        totalAnnualDividends: safeNum(data.totalAnnualDividends),
+        totalQuarterlyDividends: safeNum(data.totalQuarterlyDividends),
+        nonCompliantRatio: safeNum(data.nonCompliantRatio),
+        annualPurification: safeNum(data.annualPurification),
+        quarterlyPurification: safeNum(data.quarterlyPurification),
+        shares: safeNum(data.shares),
+        dataSource: data.dataSource || "",
+        hasDividend: Boolean(data.hasDividend),
       });
     } catch (err) {
       console.error("getTatheerData error:", err);
@@ -262,11 +277,8 @@ export default function Zakat() {
     switch (activeTab) {
       case "zakat":
         return result?.zakatDue ?? 0;
-      case "tatheer": {
-        if (!tatheerData?.dividendPerShare) return 0;
-        const ratio = tatheerData.impureRatio ?? 1;
-        return shares * tatheerData.dividendPerShare * ratio;
-      }
+      case "tatheer":
+        return tatheerData?.annualPurification ?? 0;
       case "khums":
         return khumsAmount;
       case "sadaqah":
@@ -658,52 +670,91 @@ export default function Zakat() {
                   animate={{ opacity: 1, y: 0 }}
                   className="space-y-4"
                 >
-                  <h3 className="font-heading text-sm font-semibold text-foreground">
-                    Results for {tatheerData.companyName}
-                  </h3>
+                  {/* Stock name card */}
+                  <div className="rounded-2xl bg-muted/40 px-5 py-4 text-center">
+                    <p className="font-heading text-base font-bold text-foreground">
+                      {tatheerData.companyName} ({ticker})
+                    </p>
+                  </div>
 
-                  {tatheerData.dividendPerShare === null ? (
+                  {!tatheerData.hasDividend ? (
                     <div className="rounded-2xl border border-amber-500/20 bg-amber-50 p-5 text-center text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
                       <Info className="mx-auto mb-2 h-5 w-5" />
-                      Dividend data unavailable for this stock. The company may not pay
-                      dividends, or data could not be retrieved.
+                      This stock doesn't pay dividends. No purification is needed.
                     </div>
                   ) : (
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div className="rounded-2xl bg-muted/40 p-5 text-center">
+                    <>
+                      {/* Quarterly / Annual two-column layout */}
+                      <div className="overflow-hidden rounded-2xl border border-border/40">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border/40 bg-muted/30">
+                              <th className="px-4 py-3 text-left font-ui text-xs font-medium text-muted-foreground" />
+                              <th className="px-4 py-3 text-right font-ui text-xs font-medium text-muted-foreground">
+                                Quarterly
+                              </th>
+                              <th className="px-4 py-3 text-right font-ui text-xs font-medium text-muted-foreground">
+                                Annual
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b border-border/40">
+                              <td className="px-4 py-3 font-ui text-sm font-medium text-foreground">
+                                Dividend / Share
+                              </td>
+                              <td className="px-4 py-3 text-right font-ui text-sm text-foreground">
+                                ${tatheerData.quarterlyDividend.toFixed(4)}
+                              </td>
+                              <td className="px-4 py-3 text-right font-ui text-sm text-foreground">
+                                ${tatheerData.annualDividend.toFixed(2)}
+                              </td>
+                            </tr>
+                            <tr className="border-b border-border/40">
+                              <td className="px-4 py-3 font-ui text-sm font-medium text-foreground">
+                                Total Dividends
+                              </td>
+                              <td className="px-4 py-3 text-right font-ui text-sm text-foreground">
+                                ${tatheerData.totalQuarterlyDividends.toFixed(2)}
+                              </td>
+                              <td className="px-4 py-3 text-right font-ui text-sm text-foreground">
+                                ${tatheerData.totalAnnualDividends.toFixed(2)}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-3 font-ui text-sm font-semibold text-foreground">
+                                Purification Amount
+                              </td>
+                              <td
+                                className="px-4 py-3 text-right font-ui text-sm font-bold"
+                                style={{ color: "#C9A962" }}
+                              >
+                                ${tatheerData.quarterlyPurification.toFixed(2)}
+                              </td>
+                              <td
+                                className="px-4 py-3 text-right font-ui text-sm font-bold"
+                                style={{ color: "#C9A962" }}
+                              >
+                                ${tatheerData.annualPurification.toFixed(2)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Non-compliant ratio */}
+                      <div className="rounded-2xl bg-muted/30 px-5 py-4 text-center">
                         <p className="font-ui text-xs font-medium text-muted-foreground">
-                          Dividend / Share
+                          Non-Compliant Income Ratio
                         </p>
-                        <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
-                          {fmt(tatheerData.dividendPerShare)}
+                        <p className="mt-1 font-heading text-lg font-bold text-foreground">
+                          {(tatheerData.nonCompliantRatio * 100).toFixed(2)}%
                         </p>
-                      </div>
-                      <div className="rounded-2xl bg-muted/40 p-5 text-center">
-                        <p className="font-ui text-xs font-medium text-muted-foreground">
-                          Total Dividends
-                        </p>
-                        <p className="mt-1.5 font-heading text-lg font-bold text-foreground">
-                          {fmt(shares * tatheerData.dividendPerShare)}
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          Based on latest annual income statement
                         </p>
                       </div>
-                      <div className="rounded-2xl bg-primary p-5 text-center text-primary-foreground">
-                        <p className="font-ui text-xs font-medium opacity-80">
-                          Purification Amount
-                        </p>
-                        <p className="mt-1.5 font-heading text-lg font-bold">
-                          {fmt(
-                            shares *
-                              tatheerData.dividendPerShare *
-                              (tatheerData.impureRatio ?? 1)
-                          )}
-                        </p>
-                        {tatheerData.impureRatio != null && (
-                          <p className="text-[10px] opacity-70">
-                            {(tatheerData.impureRatio * 100).toFixed(1)}% impure ratio
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                    </>
                   )}
                 </motion.div>
               )}
