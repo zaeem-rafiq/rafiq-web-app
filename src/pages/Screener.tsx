@@ -1,11 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, CheckCircle2, XCircle, AlertTriangle, TrendingUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { searchStocks, findStock, type HalalStock } from "@/data/halal-stocks";
+import {
+  searchExtended,
+  findStock,
+  findInIndex,
+  loadShariahIndex,
+  isHalalStock,
+  type HalalStock,
+  type ShariahIndexEntry,
+} from "@/data/halal-stocks";
 
 const statusConfig = {
   HALAL: { color: "bg-halal text-white", icon: CheckCircle2, label: "HALAL" },
@@ -53,19 +61,24 @@ function RatioCard({
 
 export default function Screener() {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<HalalStock | null>(null);
-  const [suggestions, setSuggestions] = useState<HalalStock[]>([]);
+  const [selected, setSelected] = useState<HalalStock | ShariahIndexEntry | null>(null);
+  const [suggestions, setSuggestions] = useState<(HalalStock | ShariahIndexEntry)[]>([]);
+  const [shariahIndex, setShariahIndex] = useState<ShariahIndexEntry[]>([]);
+
+  useEffect(() => {
+    loadShariahIndex().then(setShariahIndex);
+  }, []);
 
   const handleSearch = (val: string) => {
     setQuery(val);
     if (val.trim().length >= 1) {
-      setSuggestions(searchStocks(val).slice(0, 8));
+      setSuggestions(searchExtended(val, shariahIndex).slice(0, 8));
     } else {
       setSuggestions([]);
     }
   };
 
-  const selectStock = (stock: HalalStock) => {
+  const selectStock = (stock: HalalStock | ShariahIndexEntry) => {
     setSelected(stock);
     setQuery(stock.symbol);
     setSuggestions([]);
@@ -77,12 +90,19 @@ export default function Screener() {
     if (found) {
       setSelected(found);
       setSuggestions([]);
-    } else if (suggestions.length > 0) {
-      selectStock(suggestions[0]);
+    } else {
+      const indexEntry = findInIndex(query, shariahIndex);
+      if (indexEntry) {
+        setSelected(indexEntry);
+        setSuggestions([]);
+      } else if (suggestions.length > 0) {
+        selectStock(suggestions[0]);
+      }
     }
   };
 
-  const cfg = selected ? statusConfig[selected.status] : null;
+  const selectedIsDetailed = selected && isHalalStock(selected);
+  const cfg = selectedIsDetailed ? statusConfig[selected.status] : selected ? statusConfig["HALAL"] : null;
 
   return (
     <main className="container mx-auto max-w-3xl px-4 py-10 sm:py-14">
@@ -117,20 +137,26 @@ export default function Screener() {
               exit={{ opacity: 0, y: -4 }}
               className="absolute left-0 right-0 z-10 mt-2 overflow-hidden rounded-2xl border border-border/50 bg-card shadow-lg"
             >
-              {suggestions.map((s) => (
-                <button
-                  key={s.symbol}
-                  type="button"
-                  onClick={() => selectStock(s)}
-                  className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted"
-                >
-                  <span className="font-ui font-semibold text-foreground">{s.symbol}</span>
-                  <span className="flex-1 truncate text-sm text-muted-foreground">{s.name}</span>
-                  <Badge className={`text-xs ${statusConfig[s.status].color}`}>
-                    {s.status}
-                  </Badge>
-                </button>
-              ))}
+              {suggestions.map((s) => {
+                const detailed = isHalalStock(s);
+                const status = detailed ? s.status : "HALAL";
+                return (
+                  <button
+                    key={s.symbol}
+                    type="button"
+                    onClick={() => selectStock(s)}
+                    className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted"
+                  >
+                    <span className="font-ui font-semibold text-foreground">{s.symbol}</span>
+                    <span className="flex-1 truncate text-sm text-muted-foreground">
+                      {detailed ? s.name : s.sector}
+                    </span>
+                    <Badge className={`text-xs ${statusConfig[status].color}`}>
+                      {status}
+                    </Badge>
+                  </button>
+                );
+              })}
             </motion.div>
           )}
         </AnimatePresence>
@@ -155,7 +181,9 @@ export default function Screener() {
                   </div>
                   <div>
                     <h2 className="font-heading text-xl font-bold text-foreground">{selected.symbol}</h2>
-                    <p className="text-sm text-muted-foreground">{selected.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedIsDetailed ? selected.name : selected.sector}
+                    </p>
                     <p className="text-xs text-muted-foreground">{selected.sector}</p>
                   </div>
                 </div>
@@ -167,54 +195,74 @@ export default function Screener() {
             </Card>
 
             {/* AAOIFI Ratios */}
-            <Card className="border-border/50 bg-card shadow-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="font-heading text-lg">AAOIFI Screening Criteria</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <RatioCard
-                    label="Debt Ratio"
-                    value={selected.ratios.debtRatio}
-                    threshold={33}
-                    unit="<"
-                    pass={selected.ratios.debtRatio < 33}
-                  />
-                  <RatioCard
-                    label="Interest Income"
-                    value={selected.ratios.interestIncome}
-                    threshold={5}
-                    unit="<"
-                    pass={selected.ratios.interestIncome < 5}
-                  />
-                  <RatioCard
-                    label="Cash & Securities"
-                    value={selected.ratios.cashSecurities}
-                    threshold={33}
-                    unit="<"
-                    pass={selected.ratios.cashSecurities < 33}
-                  />
-                  <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between">
-                      <span className="font-ui text-sm font-medium text-foreground">Business Activity</span>
-                      {selected.ratios.businessActivity === "PASS" ? (
-                        <CheckCircle2 className="h-5 w-5 text-halal" />
-                      ) : selected.ratios.businessActivity === "FAIL" ? (
-                        <XCircle className="h-5 w-5 text-haram" />
-                      ) : (
-                        <AlertTriangle className="h-5 w-5 text-questionable" />
-                      )}
+            {selectedIsDetailed ? (
+              <Card className="border-border/50 bg-card shadow-sm">
+                <CardHeader className="pb-4">
+                  <CardTitle className="font-heading text-lg">AAOIFI Screening Criteria</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <RatioCard
+                      label="Debt Ratio"
+                      value={selected.ratios.debtRatio}
+                      threshold={33}
+                      unit="<"
+                      pass={selected.ratios.debtRatio < 33}
+                    />
+                    <RatioCard
+                      label="Interest Income"
+                      value={selected.ratios.interestIncome}
+                      threshold={5}
+                      unit="<"
+                      pass={selected.ratios.interestIncome < 5}
+                    />
+                    <RatioCard
+                      label="Cash & Securities"
+                      value={selected.ratios.cashSecurities}
+                      threshold={33}
+                      unit="<"
+                      pass={selected.ratios.cashSecurities < 33}
+                    />
+                    <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="font-ui text-sm font-medium text-foreground">Business Activity</span>
+                        {selected.ratios.businessActivity === "PASS" ? (
+                          <CheckCircle2 className="h-5 w-5 text-halal" />
+                        ) : selected.ratios.businessActivity === "FAIL" ? (
+                          <XCircle className="h-5 w-5 text-haram" />
+                        ) : (
+                          <AlertTriangle className="h-5 w-5 text-questionable" />
+                        )}
+                      </div>
+                      <div className="font-heading text-2xl font-bold text-foreground">
+                        {selected.ratios.businessActivity}
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Core business must be Shariah-compliant
+                      </p>
                     </div>
-                    <div className="font-heading text-2xl font-bold text-foreground">
-                      {selected.ratios.businessActivity}
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Core business must be Shariah-compliant
-                    </p>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-border/50 bg-card shadow-sm">
+                <CardContent className="p-7">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-halal" />
+                    <div>
+                      <p className="font-ui text-sm font-medium text-foreground">
+                        Shariah Index Constituent
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        This stock is included in the Dow Jones Islamic Market / S&P Shariah Index
+                        and has passed Shariah screening criteria. Detailed AAOIFI ratio breakdowns
+                        are not yet available for this stock.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </motion.div>
         ) : (
           <motion.div
