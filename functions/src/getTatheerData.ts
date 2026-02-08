@@ -26,6 +26,11 @@ interface FmpIncomeStatement {
   totalOtherIncomeExpensesNet?: number;
 }
 
+interface FmpSearchResult {
+  symbol?: string;
+  name?: string;
+}
+
 export const getTatheerData = onCall(
   { secrets: [fmpApiKey] },
   async (request) => {
@@ -49,22 +54,39 @@ export const getTatheerData = onCall(
       );
     }
 
-    // Fetch all 3 endpoints in parallel
+    // Resolve user input (could be company name like "CUMMINS") to actual ticker symbol
+    let resolvedTicker = ticker;
+    try {
+      const searchResp = await fetch(
+        `${FMP_BASE}/search?query=${encodeURIComponent(ticker)}&limit=1&apikey=${apiKey}`
+      );
+      if (searchResp.ok) {
+        const searchResults: FmpSearchResult[] = await searchResp.json();
+        if (searchResults?.[0]?.symbol) {
+          resolvedTicker = searchResults[0].symbol.toUpperCase();
+          console.log(`Resolved "${ticker}" to "${resolvedTicker}"`);
+        }
+      }
+    } catch (err) {
+      console.log(`Ticker search failed for "${ticker}", using original input`);
+    }
+
+    // Fetch all 3 endpoints in parallel using resolved ticker
     const [profileResp, dividendResp, incomeResp] = await Promise.all([
-      fetch(`${FMP_BASE}/profile/${ticker}?apikey=${apiKey}`),
+      fetch(`${FMP_BASE}/profile/${resolvedTicker}?apikey=${apiKey}`),
       fetch(
-        `${FMP_BASE}/historical-price-full/stock_dividend/${ticker}?apikey=${apiKey}`
+        `${FMP_BASE}/historical-price-full/stock_dividend/${resolvedTicker}?apikey=${apiKey}`
       ),
-      fetch(`${FMP_BASE}/income-statement/${ticker}?limit=1&apikey=${apiKey}`),
+      fetch(`${FMP_BASE}/income-statement/${resolvedTicker}?limit=1&apikey=${apiKey}`),
     ]);
 
     // --- Profile ---
-    let companyName = ticker;
+    let companyName = resolvedTicker;
     let lastDiv = 0;
     if (profileResp.ok) {
       const profileData: FmpProfile[] = await profileResp.json();
       if (profileData?.[0]) {
-        companyName = profileData[0].companyName || ticker;
+        companyName = profileData[0].companyName || resolvedTicker;
         lastDiv = profileData[0].lastDiv || 0;
       }
     }
