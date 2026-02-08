@@ -174,11 +174,10 @@ export default function Zakat() {
   useEffect(() => {
     async function fetchPrices() {
       try {
-        const callMetalPrices = httpsCallable(functions, "metal-prices");
-        const result = await callMetalPrices({});
-        const data = result.data as any;
-        if (data.goldPerGram && data.silverPerGram) {
-          setPrices({ goldPerGram: data.goldPerGram, silverPerGram: data.silverPerGram });
+        const resp = await fetch("https://api.metals.dev/v1/latest?api_key=demo&currency=USD&unit=gram");
+        const data = await resp.json();
+        if (data.metals?.gold && data.metals?.silver) {
+          setPrices({ goldPerGram: data.metals.gold, silverPerGram: data.metals.silver });
         }
       } catch {
         // Use fallback
@@ -231,7 +230,7 @@ export default function Zakat() {
         setShowDropdown(value.trim().length > 0);
       }
     },
-    [],
+    [djimStocks],
   );
 
   const handleSuggestionClick = useCallback(
@@ -257,14 +256,34 @@ export default function Zakat() {
 
   // --- Tatheer Logic ---
   const handleTatheerLookup = async () => {
-    if (!ticker.trim()) return;
+    // Resolve ticker from either ticker state or tickerInput
+    let resolvedTicker = ticker.trim().toUpperCase();
+
+    if (/^[A-Z]{1,5}$/.test(resolvedTicker)) {
+      // ticker is already a valid symbol, use directly
+    } else if (tickerInput.trim()) {
+      // Try to resolve from djimStocks by name
+      const q = tickerInput.trim().toLowerCase();
+      const match = djimStocks.find(s =>
+        s.name.toLowerCase().includes(q) || s.symbol.toLowerCase() === q
+      );
+      if (match) {
+        resolvedTicker = match.symbol;
+      } else {
+        // Fallback: send raw input uppercased (FMP can handle unknown tickers)
+        resolvedTicker = tickerInput.trim().toUpperCase();
+      }
+    } else {
+      return; // Nothing to look up
+    }
+
     setTatheerLoading(true);
     setTatheerError(null);
     setTatheerData(null);
 
     try {
       const callGetTatheerData = httpsCallable(functions, "getTatheerData");
-      const result = await callGetTatheerData({ symbol: ticker.trim().toUpperCase(), shares: shares });
+      const result = await callGetTatheerData({ symbol: resolvedTicker, shares: shares });
       const raw = result.data as any;
       // httpsCallable may nest the actual payload under a `data` or `result` key
       const data = raw?.data ?? raw?.result ?? raw;
@@ -669,7 +688,7 @@ export default function Zakat() {
               </p>
 
               <div ref={dropdownRef}>
-                <Label className="font-ui text-sm font-medium">Stock Ticker</Label>
+                <Label className="font-ui text-sm font-medium">Stock Ticker or Company Name</Label>
                 <div className="relative mt-1.5">
                   <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -727,7 +746,7 @@ export default function Zakat() {
 
               <Button
                 onClick={handleTatheerLookup}
-                disabled={tatheerLoading || !ticker.trim()}
+                disabled={tatheerLoading || (!ticker.trim() && !tickerInput.trim())}
                 className="w-full gap-2 font-ui font-semibold"
               >
                 {tatheerLoading ? (
