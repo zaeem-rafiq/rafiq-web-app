@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Calculator,
@@ -26,6 +26,7 @@ import {
   type ZakatResult,
   calculateZakat,
 } from "@/lib/zakat-utils";
+import { loadDJIMData, type DJIMStock } from "@/data/halal-stocks";
 
 const madhabs: Madhab[] = ["Hanafi", "Shafi'i", "Maliki", "Hanbali", "Ja'fari"];
 
@@ -155,6 +156,12 @@ export default function Zakat() {
   } | null>(null);
   const [tatheerError, setTatheerError] = useState<string | null>(null);
 
+  // --- Ticker Autocomplete State ---
+  const [tickerInput, setTickerInput] = useState("");
+  const [djimStocks, setDjimStocks] = useState<DJIMStock[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   // --- Khums State ---
   const [totalIncome, setTotalIncome] = useState<number>(0);
   const [totalExpenses, setTotalExpenses] = useState<number>(0);
@@ -181,6 +188,60 @@ export default function Zakat() {
     }
     fetchPrices();
   }, []);
+
+  // Load DJIM data on mount
+  useEffect(() => {
+    loadDJIMData().then(setDjimStocks);
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Filter DJIM stocks based on input
+  const isExactTicker = /^[A-Z]{1,5}$/.test(tickerInput);
+  const filteredStocks = (() => {
+    if (!tickerInput.trim() || isExactTicker) return [];
+    const q = tickerInput.toLowerCase();
+    return djimStocks
+      .filter(
+        (s) =>
+          s.symbol.toLowerCase().includes(q) ||
+          s.name.toLowerCase().includes(q),
+      )
+      .slice(0, 8);
+  })();
+
+  const handleTickerInputChange = useCallback(
+    (value: string) => {
+      setTickerInput(value);
+      const upper = value.trim().toUpperCase();
+      if (/^[A-Z]{1,5}$/.test(upper)) {
+        setTicker(upper);
+        setShowDropdown(false);
+      } else {
+        setTicker("");
+        setShowDropdown(value.trim().length > 0);
+      }
+    },
+    [],
+  );
+
+  const handleSuggestionClick = useCallback(
+    (stock: DJIMStock) => {
+      setTicker(stock.symbol);
+      setTickerInput(`${stock.name} (${stock.symbol})`);
+      setShowDropdown(false);
+    },
+    [],
+  );
 
   const showNisabToggle = ["Shafi'i", "Maliki", "Hanbali"].includes(madhab);
 
@@ -607,17 +668,46 @@ export default function Zakat() {
                 may come from non-halal business activities.
               </p>
 
-              <div>
+              <div ref={dropdownRef}>
                 <Label className="font-ui text-sm font-medium">Stock Ticker</Label>
                 <div className="relative mt-1.5">
                   <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     type="text"
-                    value={ticker}
-                    onChange={(e) => setTicker(e.target.value.toUpperCase())}
+                    value={tickerInput}
+                    onChange={(e) => handleTickerInputChange(e.target.value)}
+                    onFocus={() => {
+                      if (tickerInput.trim() && !isExactTicker) setShowDropdown(true);
+                    }}
                     className="bg-card pl-11"
-                    placeholder="e.g. AAPL"
+                    placeholder="e.g. AAPL or Apple"
                   />
+                  {showDropdown && filteredStocks.length > 0 && (
+                    <div
+                      className="absolute left-0 right-0 top-full mt-1 overflow-hidden rounded-md border border-border bg-white shadow-lg"
+                      style={{ zIndex: 50 }}
+                    >
+                      {filteredStocks.map((stock) => (
+                        <button
+                          key={stock.symbol}
+                          type="button"
+                          className="w-full px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:text-white"
+                          style={{ backgroundColor: "white" }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#2D5A3D";
+                            e.currentTarget.style.color = "white";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "white";
+                            e.currentTarget.style.color = "";
+                          }}
+                          onClick={() => handleSuggestionClick(stock)}
+                        >
+                          {stock.name} ({stock.symbol})
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
