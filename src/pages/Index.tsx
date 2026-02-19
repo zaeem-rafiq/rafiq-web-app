@@ -1,24 +1,43 @@
 import { useState } from "react";
-import type { Variants } from "framer-motion";
-import { Link } from "react-router-dom";
-import { Search, Calculator, MessageCircle, ArrowRight, Mail } from "lucide-react";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import CountdownTimer from "@/components/CountdownTimer";
+import { ClipboardCheck } from "lucide-react";
 import HeroSection from "@/components/landing/HeroSection";
+import ProblemSection from "@/components/landing/ProblemSection";
+import SolutionSection from "@/components/landing/SolutionSection";
+import ShowYourWorkPanel from "@/components/landing/ShowYourWorkPanel";
+import HowItWorksSection from "@/components/landing/HowItWorksSection";
 import FeatureCards from "@/components/landing/FeatureCards";
-import WaitlistSection from "@/components/landing/WaitlistSection";
+import SocialProofSection from "@/components/landing/SocialProofSection";
+import FinalCTASection from "@/components/landing/FinalCTASection";
 import FooterSection from "@/components/landing/FooterSection";
+import LeadMagnetQuiz from "@/components/landing/LeadMagnetQuiz";
 
 export default function Index() {
+  const [quizOpen, setQuizOpen] = useState(false);
+
   return (
     <main className="flex flex-col">
       <HeroSection />
+      <ProblemSection />
+      <SolutionSection />
+      <ShowYourWorkPanel />
+      <HowItWorksSection />
       <FeatureCards />
-      <WaitlistSection />
+      <SocialProofSection />
+      <FinalCTASection />
       <FooterSection />
+
+      {/* Floating quiz widget */}
+      <button
+        onClick={() => setQuizOpen(true)}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-primary px-5 py-3 font-ui text-sm font-semibold text-primary-foreground shadow-lg transition hover:bg-primary/90"
+      >
+        <ClipboardCheck size={16} />
+        <span className="hidden sm:inline">Get Your Zakat Readiness Score</span>
+        <span className="sm:hidden">Quiz</span>
+      </button>
+
+      {/* Quiz modal */}
+      <LeadMagnetQuiz isOpen={quizOpen} onClose={() => setQuizOpen(false)} />
     </main>
   );
 }

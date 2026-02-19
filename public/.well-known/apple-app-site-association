@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "AD9TP86247.money.rafiq.app",
+        "paths": ["/plaid-oauth"]
+      }
+    ]
+  }
+}

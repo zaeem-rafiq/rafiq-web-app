@@ -139,7 +139,7 @@ export function searchShariahByName(
     .map((s) => ({ symbol: s.symbol, name: s.name || s.symbol, sector: s.sector }));
 }
 
-export { loadDJIMData, type DJIMStock } from "./djim-stocks";
+export { loadDJIMData, searchStocks as searchDJIM, isDJIMStock, type DJIMStock } from "./djim-stocks";
 
 export function findInIndex(
   symbol: string,

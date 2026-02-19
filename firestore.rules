@@ -1,0 +1,251 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check ownership
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // ===========================================
+    // USER DOCUMENT & SUBCOLLECTIONS (FinancialService)
+    // ===========================================
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      // All subcollections under user document
+      match /zakatPayments/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /khumsPayments/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /budgets/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /portfolio/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /sadaqah/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /charityGoals/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /givingRecords/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /zakatCalculations/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /khumsCalculations/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // ===========================================
+    // ROOT-LEVEL COLLECTIONS (DataService)
+    // ===========================================
+    match /accounts/{docId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /transactions/{docId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /budgets/{docId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /zakatRecords/{docId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /khumsRecords/{docId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /watchlist/{docId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /sadaqah/{docId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /recurringTransactions/{docId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /netWorthHistory/{docId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /portfolio/{docId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /givingRecords/{docId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /goals/{docId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // ===========================================
+    // SERVER-ONLY COLLECTIONS (Cloud Functions via Admin SDK)
+    // ===========================================
+
+    // Plaid access tokens — NEVER expose to clients
+    match /plaidItems/{docId} {
+      allow read, write: if false;
+    }
+
+    // Webhook deduplication — server-only (Cloud Functions admin SDK)
+    match /processedWebhooks/{docId} {
+      allow read, write: if false;
+    }
+
+    // Rate limiting — server-only (Cloud Functions admin SDK)
+    match /rateLimits/{docId} {
+      allow read, write: if false;
+    }
+
+    // Stock screening cache — server-only (Cloud Functions admin SDK)
+    match /stockScreeningCache/{symbol} {
+      allow read, write: if false;
+    }
+
+    // Comprehensive US stock database — server-only (pre-computed AAOIFI screening + purification data)
+    match /stock_database/{symbol} {
+      allow read, write: if false;
+    }
+
+    // ETF/fund info cache — server-only (24h TTL, AUM + expense ratios from FMP)
+    match /stockETFCache/{symbol} {
+      allow read, write: if false;
+    }
+
+    // Knowledge base — server-only (seeded via Cloud Function, read via admin SDK for RAG)
+    match /knowledgeBase/{docId} {
+      allow read, write: if false;
+    }
+
+    // Platform config — authenticated read (metal prices, exchange rates, nisab),
+    // server-only write (refreshed every 4 hours by scheduled Cloud Function)
+    match /platformConfig/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Stock profile cache — server-only (Cloud Functions admin SDK)
+    match /stockProfileCache/{symbol} {
+      allow read, write: if false;
+    }
+
+    // Charities — readable by authenticated users, writable only by admin (Cloud Functions)
+    match /charities/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Mosques — readable by authenticated users, writable only by admin (Cloud Functions)
+    match /mosques/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Conversations (Ask Rafiq) — user-scoped with messages subcollection
+    match /conversations/{conversationId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      match /messages/{messageId} {
+        allow read, write: if request.auth != null &&
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data.userId == request.auth.uid;
+      }
+    }
+
+    // Recurring donations — user-scoped
+    match /recurringDonations/{docId} {
+      allow list: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Tips (Support Rafiq IAP) — user-scoped, immutable
+    match /tips/{docId} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ===========================================
+    // PUBLIC COLLECTIONS
+    // ===========================================
+    match /waitlist/{docId} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
+
+    match /quiz_leads/{docId} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
+
+    match /screener_leads/{docId} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
+
+    match /askRafiqEmails/{docId} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
+
+    match /feedback/{docId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if false;
+    }
+  }
+}

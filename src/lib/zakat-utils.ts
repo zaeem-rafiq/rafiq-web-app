@@ -1,4 +1,5 @@
-export type Madhab = "Hanafi" | "Shafi'i" | "Maliki" | "Hanbali" | "Ja'fari";
+// Madhab values match iOS enum raw values (lowercase, no punctuation)
+export type Madhab = "hanafi" | "shafii" | "maliki" | "hanbali" | "jafari";
 export type NisabStandard = "gold" | "silver";
 
 export interface ZakatAssets {
@@ -52,7 +53,7 @@ export function calculateZakat(
     includeRetirement?: boolean;
   }
 ): ZakatResult {
-  const isJafari = madhab === "Ja'fari";
+  const isJafari = madhab === "jafari";
 
   // Calculate asset values
   const goldValue = assets.gold * prices.goldPerGram;
@@ -61,7 +62,7 @@ export function calculateZakat(
 
   // Jewelry handling — madhab-dependent
   let jewelryValue = 0;
-  if (madhab === "Hanafi") {
+  if (madhab === "hanafi") {
     jewelryValue = assets.personalJewelry; // Hanafi: always included
   } else if (isJafari) {
     jewelryValue = 0; // Ja'fari: never included
@@ -71,7 +72,7 @@ export function calculateZakat(
 
   // Retirement handling — madhab-dependent
   let retirementValue = 0;
-  if ((madhab === "Shafi'i" || madhab === "Hanbali") && options?.includeRetirement) {
+  if ((madhab === "shafii" || madhab === "hanbali") && options?.includeRetirement) {
     retirementValue = assets.retirementAccounts * STOCK_ZAKATABLE_RATIO;
   }
 
@@ -85,9 +86,9 @@ export function calculateZakat(
 
   // Madhab-specific deductions
   let totalDeductions = 0;
-  if (madhab === "Shafi'i") {
+  if (madhab === "shafii") {
     totalDeductions = 0; // Shafi'i: no debt deduction — zakat on gross assets
-  } else if (madhab === "Hanafi") {
+  } else if (madhab === "hanafi") {
     totalDeductions = assets.debtsOwed + assets.livingExpenses; // Hanafi: debts + living expenses
   } else {
     totalDeductions = assets.debtsOwed; // Maliki, Hanbali, Ja'fari: debts only
@@ -97,7 +98,7 @@ export function calculateZakat(
 
   // Determine Nisab
   let effectiveNisabStandard = nisabStandard;
-  if (madhab === "Hanafi") {
+  if (madhab === "hanafi") {
     effectiveNisabStandard = "silver"; // Hanafi uses silver
   } else if (isJafari) {
     effectiveNisabStandard = "gold"; // Ja'fari uses gold for their zakat categories
@@ -152,10 +153,10 @@ export function calculateZakat(
     }
 
     // Deduction rows
-    if (madhab !== "Shafi'i") {
+    if (madhab !== "shafii") {
       breakdown.push({ category: "Debts Owed", amount: -assets.debtsOwed, zakatOn: 0 });
     }
-    if (madhab === "Hanafi" && assets.livingExpenses > 0) {
+    if (madhab === "hanafi" && assets.livingExpenses > 0) {
       breakdown.push({ category: "Living Expenses", amount: -assets.livingExpenses, zakatOn: 0 });
     }
   }
