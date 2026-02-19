@@ -311,7 +311,7 @@ function MessageBubble({ msg, isLast }: { msg: Msg; isLast: boolean }) {
             }`}
         >
           {!isUser ? (
-            <div className="prose prose-sm max-w-none dark:prose-invert [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1">
+            <div className="prose prose-sm max-w-none [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1">
               <ReactMarkdown>{msg.content}</ReactMarkdown>
             </div>
           ) : (

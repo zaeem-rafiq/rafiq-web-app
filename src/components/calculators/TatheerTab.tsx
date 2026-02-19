@@ -359,7 +359,7 @@ export default function TatheerTab({ onAmountChange }: TatheerTabProps) {
             </h3>
 
             {tatheerData.hasDividend === false ? (
-              <div className="rounded-2xl border border-amber-500/20 bg-amber-50 p-5 text-center text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-50 p-5 text-center text-sm text-amber-800">
                 <Info className="mx-auto mb-2 h-5 w-5" />
                 {tatheerData.isNotHalal
                   ? "This stock doesn't pay dividends, but it is still classified as not halal. Consider selling your shares."

@@ -6,9 +6,6 @@ import {
   Pencil,
   Check,
   X,
-  Moon,
-  Sun,
-  Monitor,
   CalendarDays,
   HelpCircle,
   Search,
@@ -51,7 +48,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, MADHAB_LABELS, type Madhab, type Marja } from "@/contexts/AuthContext";
-import { useTheme } from "@/hooks/use-theme";
+
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -129,8 +126,6 @@ export default function Settings() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, userProfile, updateUserProfile, logout, deleteAccount } = useAuth();
-  const { theme, setTheme } = useTheme();
-
   // Profile editing
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
@@ -384,7 +379,7 @@ export default function Settings() {
 
         {/* ─── 1. Profile Hero Card ────────────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-          <Card className="overflow-hidden rounded-2xl border-border/30 bg-white/70 shadow-lg backdrop-blur-xl dark:bg-card/70">
+          <Card className="overflow-hidden rounded-2xl border-border/30 bg-white/70 shadow-lg backdrop-blur-xl bg-card/70">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16 border-2 border-border/30">
@@ -446,7 +441,7 @@ export default function Settings() {
 
         {/* ─── 2. Islamic Settings ──────────────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card className="overflow-hidden rounded-2xl border-border/30 bg-white/70 shadow-lg backdrop-blur-xl dark:bg-card/70">
+          <Card className="overflow-hidden rounded-2xl border-border/30 bg-white/70 shadow-lg backdrop-blur-xl bg-card/70">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 font-heading text-lg">
                 <BookOpen size={18} style={{ color: "#2D5A3D" }} />
@@ -642,7 +637,7 @@ export default function Settings() {
                       )}
                     </div>
                     {showMosqueResults && mosqueQuery.length >= 2 && (
-                      <div className="absolute z-20 mt-1 w-full rounded-xl border border-border/50 bg-white shadow-xl dark:bg-card">
+                      <div className="absolute z-20 mt-1 w-full rounded-xl border border-border/50 bg-white shadow-xl bg-card">
                         <div className="max-h-48 overflow-y-auto">
                           {mosqueResults.length > 0 ? mosqueResults.map((m) => (
                             <button
@@ -673,48 +668,9 @@ export default function Settings() {
           </Card>
         </motion.div>
 
-        {/* ─── 3. Appearance ────────────────────────────────────────────── */}
+        {/* ─── 3. Help & FAQ ───────────────────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-          <Card className="overflow-hidden rounded-2xl border-border/30 bg-white/70 shadow-lg backdrop-blur-xl dark:bg-card/70">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 font-heading text-lg">
-                <Sun size={18} style={{ color: "#C9A962" }} />
-                Appearance
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pb-6">
-              <Label className="mb-2 block text-sm font-medium text-muted-foreground">Theme</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {([
-                  { value: "system" as const, label: "System", icon: Monitor },
-                  { value: "light" as const, label: "Light", icon: Sun },
-                  { value: "dark" as const, label: "Dark", icon: Moon },
-                ]).map((opt) => {
-                  const Icon = opt.icon;
-                  const selected = theme === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      onClick={() => setTheme(opt.value)}
-                      className={`flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-medium transition-all ${
-                        selected
-                          ? "border-[#2D5A3D] bg-[#2D5A3D]/5 text-[#2D5A3D] dark:text-primary"
-                          : "border-border/40 text-muted-foreground hover:border-border"
-                      }`}
-                    >
-                      <Icon size={16} />
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* ─── 4. Help & FAQ ───────────────────────────────────────────── */}
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Card className="overflow-hidden rounded-2xl border-border/30 bg-white/70 shadow-lg backdrop-blur-xl dark:bg-card/70">
+          <Card className="overflow-hidden rounded-2xl border-border/30 bg-white/70 shadow-lg backdrop-blur-xl bg-card/70">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 font-heading text-lg">
                 <HelpCircle size={18} style={{ color: "#2D5A3D" }} />
@@ -745,7 +701,7 @@ export default function Settings() {
 
         {/* ─── 5. Contact Support ──────────────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-          <Card className="overflow-hidden rounded-2xl border-border/30 bg-white/70 shadow-lg backdrop-blur-xl dark:bg-card/70">
+          <Card className="overflow-hidden rounded-2xl border-border/30 bg-white/70 shadow-lg backdrop-blur-xl bg-card/70">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 font-heading text-lg">
                 <Mail size={18} style={{ color: "#2D5A3D" }} />
@@ -788,7 +744,7 @@ export default function Settings() {
 
         {/* ─── 6. Legal Links ──────────────────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <Card className="overflow-hidden rounded-2xl border-border/30 bg-white/70 shadow-lg backdrop-blur-xl dark:bg-card/70">
+          <Card className="overflow-hidden rounded-2xl border-border/30 bg-white/70 shadow-lg backdrop-blur-xl bg-card/70">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 font-heading text-lg">
                 <Scale size={18} style={{ color: "#2D5A3D" }} />
@@ -824,7 +780,7 @@ export default function Settings() {
 
         {/* ─── 7. Account Actions ─────────────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
-          <Card className="overflow-hidden rounded-2xl border-border/30 bg-white/70 shadow-lg backdrop-blur-xl dark:bg-card/70">
+          <Card className="overflow-hidden rounded-2xl border-border/30 bg-white/70 shadow-lg backdrop-blur-xl bg-card/70">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 font-heading text-lg">
                 <User size={18} style={{ color: "#2D5A3D" }} />
